@@ -1,0 +1,10 @@
+{
+  "software_name": "SA-US ERP",
+  "developer_name": "SA Ultimate Solutions",
+  "client_company_name": "Your Company Name",
+  "company_logo_path": "company_logo.png",
+  "show_developer_branding": true,
+  "app_logo_path": "branding/app_logo.png",
+  "developer_logo_path": "branding/sa_ultimate_solutions_logo.png",
+  "primary_color": "#1F4E78"
+}

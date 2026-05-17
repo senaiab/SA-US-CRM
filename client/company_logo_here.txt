@@ -1,0 +1,2 @@
+Place your client company's logo file in this client folder and name it company_logo.png
+Then edit tenant_branding.json and set client_company_name if needed.

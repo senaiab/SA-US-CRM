@@ -1,0 +1,94 @@
+name: Build Windows EXE
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Nuitka and dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install nuitka ordered-set zstandard
+          pip install -r server/requirements.txt
+          pip install -r client/requirements.txt
+
+      - name: Convert PNG icon to ICO
+        run: |
+          python - <<'EOF'
+          from PIL import Image
+          img = Image.open("client/branding/app_logo.png").convert("RGBA")
+          sizes = [(16,16),(32,32),(48,48),(64,64),(128,128),(256,256)]
+          imgs = [img.resize(s, Image.LANCZOS) for s in sizes]
+          imgs[0].save("build_icon.ico", format="ICO", sizes=sizes, append_images=imgs[1:])
+          print("Icon converted.")
+          EOF
+        shell: bash
+
+      - name: Build Server EXE
+        run: |
+          cd server
+          python -m nuitka `
+            --onefile `
+            --assume-yes-for-downloads `
+            --output-dir="..\dist\server" `
+            --output-filename="SA_US_ERP_Server.exe" `
+            --windows-icon-from-ico="..\build_icon.ico" `
+            --company-name="SA Ultimate Solutions" `
+            --product-name="SA-US ERP Server" `
+            --file-version="2.1.0.0" `
+            --product-version="2.1.0.0" `
+            app.py
+
+      - name: Copy server assets
+        run: copy server\server_config.ini dist\server\
+
+      - name: Build Client EXE
+        run: |
+          cd client
+          python -m nuitka `
+            --onefile `
+            --assume-yes-for-downloads `
+            --output-dir="..\dist\client" `
+            --output-filename="SA_US_ERP_Client.exe" `
+            --windows-icon-from-ico="..\build_icon.ico" `
+            --windows-console-mode=disable `
+            --enable-plugin=tk-inter `
+            --company-name="SA Ultimate Solutions" `
+            --product-name="SA-US ERP Client" `
+            --file-version="2.1.0.0" `
+            --product-version="2.1.0.0" `
+            --include-data-dir=branding=branding `
+            client_app.py
+
+      - name: Copy client assets
+        run: |
+          copy client\client_config.ini dist\client\
+          copy client\tenant_branding.json dist\client\
+          xcopy /E /I client\branding dist\client\branding
+
+      - name: Upload Server EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: SA_US_ERP_Server
+          path: dist/server/
+          retention-days: 30
+
+      - name: Upload Client EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: SA_US_ERP_Client
+          path: dist/client/
+          retention-days: 30

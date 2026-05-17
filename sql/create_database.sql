@@ -1,0 +1,4 @@
+CREATE DATABASE IF NOT EXISTS sa_us_erp CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER IF NOT EXISTS 'sa_us_user'@'localhost' IDENTIFIED BY 'SAUSERP2026!';
+GRANT ALL PRIVILEGES ON sa_us_erp.* TO 'sa_us_user'@'localhost';
+FLUSH PRIVILEGES;

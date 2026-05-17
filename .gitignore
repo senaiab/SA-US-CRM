@@ -1,0 +1,44 @@
+# ─── Python ───────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# ─── Virtual environments ─────────────────────────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+
+# ─── PyInstaller / Nuitka build artefacts ────────────────────────────────────
+build/
+server/build/
+client/build/
+server/dist/
+client/dist/
+dist/
+*.spec.bak
+nuitka-crash-report.xml
+
+# ─── Release output (compiled EXEs, payload ZIPs) ────────────────────────────
+release/
+
+# ─── Loose ZIP archives ───────────────────────────────────────────────────────
+windows_scripts.zip
+*.zip
+
+# ─── IDE / OS ─────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# ─── Logs & temp ─────────────────────────────────────────────────────────────
+*.log
+*.tmp
+*.bak
+install_log_*.txt
