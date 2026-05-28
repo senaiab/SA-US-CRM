@@ -1,0 +1,44 @@
+name: Build Windows EXE
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Build Windows EXEs
+        shell: cmd
+        run: build_windows.bat
+
+      - name: Upload server artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SA_US_ERP_Server
+          path: |
+            server/dist/SA_US_ERP_Server.exe
+            server/dist/server_config.ini
+          retention-days: 30
+
+      - name: Upload client artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SA_US_ERP_Client
+          path: |
+            client/dist/SA_US_ERP_Client.exe
+            client/dist/client_config.ini
+            client/dist/tenant_branding.json
+            client/dist/branding/**
+          retention-days: 30

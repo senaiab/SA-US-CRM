@@ -11,6 +11,13 @@ venv/
 env/
 ENV/
 
+# ─── Local runtime configuration / secrets ────────────────────────────────────
+server/server_secret.key
+*.local.ini
+.env
+.env.*
+!.env.example
+
 # ─── PyInstaller / Nuitka build artefacts ────────────────────────────────────
 build/
 server/build/
