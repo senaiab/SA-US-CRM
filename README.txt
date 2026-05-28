@@ -5,6 +5,10 @@ Developed and distributed by SA Ultimate Solutions.
 
 This package provides a local-network ERP/CRM starter system that runs on office PCs without cPanel and without internet.
 
+Current version
+---------------
+See VERSION.txt.
+
 Branding rules
 --------------
 - Software product name: SA-US ERP
@@ -28,29 +32,37 @@ Default login
 Username: admin
 Password: admin123
 
-Change this immediately after first login from the Admin tab.
+Change this immediately after first login from the Admin tab or Change Password button.
 
 Important folders
 -----------------
-server\app.py                  API server
-server\server_config.ini       Database and server settings
-client\client_app.py           Desktop client
-client\client_config.ini       Server IP address for client PCs
-client\tenant_branding.json    Client-company branding settings
-client\branding\              App logo and developer logo assets
-sql\create_database.sql        Database and user creation script
-windows_scripts\*.bat          Install, run, build, and backup scripts
-docs\BRANDING_SETUP.md         How to apply the client company name and logo
+server\app.py                       API server
+server\server_config.ini            Local database and server settings
+server\server_config.example.ini    Safe example configuration
+client\client_app.py                Desktop client
+client\client_config.ini            Server IP address for client PCs
+client\tenant_branding.json         Client-company branding settings
+client\branding\                   App logo and developer logo assets
+sql\create_database.sql             Database and user creation script
+windows_scripts\*.bat               Install, run, build, and backup scripts
+docs\BRANDING_SETUP.md              How to apply the client company name and logo
+docs\PRODUCTION_HARDENING.md        Production-readiness roadmap
+docs\RELEASE_PROCESS.md             Release and packaging checklist
 
 Initial setup on the Server PC
 ------------------------------
 1. Install Python 3.11 or newer. Tick "Add Python to PATH".
 2. Install MariaDB or MySQL on the Server PC.
-3. Run the SQL in:
+3. Copy or edit:
+   server\server_config.example.ini
+   into:
+   server\server_config.ini
+4. Set a strong database password in:
    sql\create_database.sql
-4. Confirm server\server_config.ini is correct.
-5. Run:
-   windows_scripts\01_install_server_dependencies.bat
+   and in:
+   server\server_config.ini
+5. Run the SQL in:
+   sql\create_database.sql
 6. Start the server:
    windows_scripts\02_run_server.bat
 7. Test:
@@ -78,7 +90,10 @@ Client setup on staff PCs
 
 Building EXE files
 ------------------
-Run on a Windows PC:
+Official build command:
+   build_windows.bat
+
+This calls:
    windows_scripts\05_build_exe_files.bat
 
 This builder script will:
@@ -118,4 +133,4 @@ Modules included
 
 Security note
 -------------
-Change the default password, change the database password, update the secret_key in server_config.ini, and restrict access to the office LAN only.
+Change the default password, change the database password, use a persistent secret_key or generated server_secret.key, and restrict access to the office LAN only.
