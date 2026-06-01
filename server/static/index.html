@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#1565c0">
+<title>SA-US ERP</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f4f6f9;color:#1a1a2e;font-size:15px}
+:root{--blue:#1565c0;--blue-dark:#0d47a1;--blue-light:#e3f2fd;--accent:#ff6f00;--green:#2e7d32;--red:#c62828;--gray:#78909c;--surface:#fff;--border:#e0e0e0;--nav-h:60px;--header-h:56px}
+
+/* ── Layout ── */
+#app{display:flex;flex-direction:column;height:100%}
+#view{flex:1;overflow-y:auto;padding-bottom:var(--nav-h)}
+.screen{display:none;min-height:100%}
+.screen.active{display:block}
+
+/* ── Header ── */
+.top-bar{position:sticky;top:0;z-index:100;background:var(--blue);color:#fff;height:var(--header-h);display:flex;align-items:center;padding:0 16px;gap:10px;box-shadow:0 2px 6px rgba(0,0,0,.25)}
+.top-bar h1{font-size:17px;font-weight:600;flex:1}
+.top-bar .ico-btn{background:none;border:none;color:#fff;font-size:22px;cursor:pointer;padding:8px;border-radius:50%;display:flex;align-items:center;justify-content:center;min-width:40px;min-height:40px}
+.top-bar .ico-btn:active{background:rgba(255,255,255,.15)}
+.search-bar{background:var(--blue-dark);padding:8px 16px 12px}
+.search-bar input{width:100%;padding:9px 14px;border-radius:24px;border:none;font-size:15px;background:#fff;outline:none}
+
+/* ── Bottom nav ── */
+#nav{position:fixed;bottom:0;left:0;right:0;height:var(--nav-h);background:#fff;border-top:1px solid var(--border);display:flex;z-index:200}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:none;background:none;cursor:pointer;color:var(--gray);font-size:10px;font-weight:500;padding:6px 0;transition:color .15s}
+.nav-item .icon{font-size:22px;line-height:1}
+.nav-item.active{color:var(--blue)}
+.nav-item:active{opacity:.7}
+
+/* ── Cards / Lists ── */
+.card{background:var(--surface);border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.1);margin:10px 14px;overflow:hidden}
+.card-header{padding:14px 16px 10px;border-bottom:1px solid var(--border);font-weight:600;font-size:14px;color:var(--gray);text-transform:uppercase;letter-spacing:.5px}
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border)}
+.stat-cell{background:#fff;padding:14px;text-align:center}
+.stat-val{font-size:28px;font-weight:700;color:var(--blue);line-height:1}
+.stat-lbl{font-size:11px;color:var(--gray);margin-top:3px}
+.stat-cell.warn .stat-val{color:var(--accent)}
+.stat-cell.danger .stat-val{color:var(--red)}
+
+.module-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:14px}
+.mod-card{background:var(--surface);border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,.1);padding:16px 12px;cursor:pointer;text-align:center;border:2px solid transparent;transition:border-color .15s}
+.mod-card:active{border-color:var(--blue)}
+.mod-card .mod-icon{font-size:28px;margin-bottom:6px}
+.mod-card .mod-name{font-size:13px;font-weight:600;color:#333}
+.mod-card .mod-count{font-size:20px;font-weight:700;color:var(--blue);margin-top:4px}
+
+.list-item{display:flex;align-items:center;padding:13px 16px;border-bottom:1px solid var(--border);cursor:pointer;background:#fff;gap:12px}
+.list-item:last-child{border-bottom:none}
+.list-item:active{background:#f5f5f5}
+.item-avatar{width:40px;height:40px;border-radius:20px;background:var(--blue-light);color:var(--blue);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;flex-shrink:0}
+.item-body{flex:1;min-width:0}
+.item-title{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item-sub{font-size:12px;color:var(--gray);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item-arrow{color:var(--border);font-size:18px}
+
+/* ── Reminder pills ── */
+.rem-section{padding:10px 14px}
+.rem-title{font-size:12px;font-weight:700;color:var(--gray);text-transform:uppercase;margin-bottom:6px}
+.rem-pill{display:flex;align-items:center;gap:8px;background:#fff3e0;border-left:3px solid var(--accent);border-radius:6px;padding:8px 12px;margin-bottom:6px;cursor:pointer}
+.rem-pill.danger{background:#ffebee;border-color:var(--red)}
+.rem-pill-text{flex:1;font-size:13px;font-weight:500}
+.rem-pill-date{font-size:11px;color:var(--gray)}
+
+/* ── FAB ── */
+.fab{position:fixed;bottom:calc(var(--nav-h) + 16px);right:18px;width:54px;height:54px;border-radius:27px;background:var(--accent);color:#fff;font-size:28px;border:none;box-shadow:0 4px 12px rgba(0,0,0,.3);cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:150;transition:transform .1s}
+.fab:active{transform:scale(.92)}
+.fab.hidden{display:none}
+
+/* ── Forms ── */
+.form-wrap{padding:14px}
+.form-group{margin-bottom:14px}
+.form-group label{display:block;font-size:12px;font-weight:600;color:var(--gray);margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px}
+.form-group input,.form-group select,.form-group textarea{width:100%;padding:11px 13px;border:1.5px solid var(--border);border-radius:8px;font-size:15px;background:#fff;outline:none;transition:border-color .15s;-webkit-appearance:none}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:var(--blue)}
+.form-group textarea{resize:vertical;min-height:80px}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+/* ── Buttons ── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:12px 20px;border-radius:8px;border:none;font-size:15px;font-weight:600;cursor:pointer;transition:opacity .15s;width:100%;margin-bottom:10px}
+.btn:active{opacity:.8}
+.btn-primary{background:var(--blue);color:#fff}
+.btn-success{background:var(--green);color:#fff}
+.btn-danger{background:var(--red);color:#fff}
+.btn-outline{background:#fff;color:var(--blue);border:1.5px solid var(--blue)}
+.btn-sm{width:auto;padding:8px 14px;font-size:13px;margin-bottom:0}
+.btn-row{display:flex;gap:10px;margin-top:6px}
+
+/* ── Tabs ── */
+.tab-bar{display:flex;background:#fff;border-bottom:2px solid var(--border)}
+.tab{flex:1;padding:12px 8px;text-align:center;font-size:13px;font-weight:600;color:var(--gray);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:color .15s,border-color .15s}
+.tab.active{color:var(--blue);border-color:var(--blue)}
+
+/* ── Login ── */
+#screen-login{background:linear-gradient(135deg,var(--blue-dark) 0%,var(--blue) 100%);min-height:100%;display:flex;align-items:center;justify-content:center;padding:24px}
+.login-box{background:#fff;border-radius:20px;padding:32px 24px;width:100%;max-width:360px;box-shadow:0 8px 32px rgba(0,0,0,.25)}
+.login-logo{text-align:center;margin-bottom:24px}
+.login-logo .brand{font-size:24px;font-weight:800;color:var(--blue)}
+.login-logo .sub{font-size:13px;color:var(--gray);margin-top:4px}
+.login-box .form-group label{color:#555}
+
+/* ── Empty / Loading ── */
+.empty{text-align:center;padding:48px 24px;color:var(--gray)}
+.empty .ico{font-size:48px;margin-bottom:12px}
+.empty p{font-size:14px}
+.loading{text-align:center;padding:32px;color:var(--gray);font-size:14px}
+.spinner{display:inline-block;width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite;margin-bottom:10px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Badge / chip ── */
+.badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700}
+.badge-green{background:#e8f5e9;color:var(--green)}
+.badge-red{background:#ffebee;color:var(--red)}
+.badge-blue{background:var(--blue-light);color:var(--blue)}
+.badge-gray{background:#eceff1;color:var(--gray)}
+
+/* ── Toast ── */
+#toast{position:fixed;bottom:calc(var(--nav-h) + 8px);left:50%;transform:translateX(-50%) translateY(20px);background:#323232;color:#fff;padding:10px 20px;border-radius:24px;font-size:14px;opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;z-index:500;white-space:nowrap;max-width:90vw;text-align:center}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ── User table ── */
+.data-table{width:100%;border-collapse:collapse;font-size:13px}
+.data-table th{background:#f5f5f5;padding:10px 12px;text-align:left;font-weight:600;color:var(--gray);font-size:12px;white-space:nowrap}
+.data-table td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:top}
+.data-table tr:last-child td{border-bottom:none}
+.table-wrap{overflow-x:auto}
+
+/* ── Divider ── */
+.divider{height:1px;background:var(--border);margin:14px 0}
+.section-label{font-size:12px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;padding:16px 14px 6px}
+
+/* ── Responsive ── */
+@media(min-width:600px){
+  #view{max-width:600px;margin:0 auto}
+  #nav{max-width:600px;left:50%;transform:translateX(-50%)}
+  .fab{right:calc(50% - 300px + 18px)}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- Login -->
+  <div id="screen-login" class="screen">
+    <div class="login-box">
+      <div class="login-logo">
+        <div class="brand">SA-US ERP</div>
+        <div class="sub">SA Ultimate Solutions</div>
+      </div>
+      <div class="form-group">
+        <label>Username</label>
+        <input id="inp-user" type="text" autocomplete="username" placeholder="Enter username">
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input id="inp-pass" type="password" autocomplete="current-password" placeholder="Enter password">
+      </div>
+      <button class="btn btn-primary" id="btn-login">Sign In</button>
+      <div id="login-err" style="color:#c62828;font-size:13px;text-align:center;margin-top:-4px"></div>
+    </div>
+  </div>
+
+  <!-- Main app (after login) -->
+  <div id="screen-app" class="screen">
+    <div id="top-bar" class="top-bar">
+      <button class="ico-btn" id="btn-back" style="display:none">&#8592;</button>
+      <h1 id="page-title">Dashboard</h1>
+      <button class="ico-btn" id="btn-search-toggle" title="Search">&#128269;</button>
+      <button class="ico-btn" id="btn-refresh" title="Refresh">&#8635;</button>
+    </div>
+    <div id="search-bar" class="search-bar" style="display:none">
+      <input id="inp-search" type="search" placeholder="Search all records…" autocomplete="off">
+    </div>
+
+    <div id="view">
+      <!-- Dashboard -->
+      <div id="tab-dashboard" class="screen active">
+        <div id="dash-content"><div class="loading"><div class="spinner"></div><br>Loading…</div></div>
+      </div>
+
+      <!-- Modules -->
+      <div id="tab-modules" class="screen">
+        <div class="module-grid" id="module-grid"></div>
+      </div>
+
+      <!-- Record list -->
+      <div id="tab-records" class="screen">
+        <div id="records-content"><div class="loading"><div class="spinner"></div></div></div>
+      </div>
+
+      <!-- Record form -->
+      <div id="tab-form" class="screen">
+        <div class="form-wrap" id="form-content"></div>
+      </div>
+
+      <!-- Admin -->
+      <div id="tab-admin" class="screen">
+        <div class="tab-bar">
+          <div class="tab active" data-atab="users" onclick="adminTab('users')">Users</div>
+          <div class="tab" data-atab="audit" onclick="adminTab('audit')">Audit Log</div>
+          <div class="tab" data-atab="newuser" onclick="adminTab('newuser')">+ User</div>
+        </div>
+        <div id="admin-users-pane"><div class="loading"><div class="spinner"></div></div></div>
+        <div id="admin-audit-pane" style="display:none"><div class="loading"><div class="spinner"></div></div></div>
+        <div id="admin-newuser-pane" style="display:none">
+          <div class="form-wrap">
+            <div class="form-group"><label>Username</label><input id="nu-user" type="text"></div>
+            <div class="form-group"><label>Full Name</label><input id="nu-name" type="text"></div>
+            <div class="form-group"><label>Role</label>
+              <select id="nu-role">
+                <option>Owner</option><option>Business Manager</option><option selected>Sales Agent</option>
+                <option>Ticketing Officer</option><option>Finance Officer</option><option>Viewer</option>
+              </select>
+            </div>
+            <div class="form-group"><label>Password</label><input id="nu-pass" type="password"></div>
+            <button class="btn btn-primary" onclick="saveNewUser()">Save User</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Profile -->
+      <div id="tab-profile" class="screen">
+        <div class="form-wrap">
+          <div class="card" style="margin:0 0 16px">
+            <div style="padding:20px;text-align:center">
+              <div style="font-size:48px;margin-bottom:8px">&#128100;</div>
+              <div style="font-weight:700;font-size:18px" id="prof-name"></div>
+              <div style="color:var(--gray);font-size:13px;margin-top:4px" id="prof-role"></div>
+            </div>
+          </div>
+          <div class="section-label">Change Password</div>
+          <div class="form-group"><label>Current Password</label><input id="cp-cur" type="password"></div>
+          <div class="form-group"><label>New Password</label><input id="cp-new" type="password"></div>
+          <div class="form-group"><label>Confirm New Password</label><input id="cp-conf" type="password"></div>
+          <button class="btn btn-primary" onclick="changePassword()">Update Password</button>
+          <div class="divider"></div>
+          <button class="btn btn-outline" onclick="logout()">&#128682; Sign Out</button>
+        </div>
+      </div>
+
+      <!-- Search results -->
+      <div id="tab-search" class="screen">
+        <div id="search-results"><div class="empty"><div class="ico">&#128269;</div><p>Type to search…</p></div></div>
+      </div>
+    </div><!-- #view -->
+
+    <!-- Bottom nav -->
+    <nav id="nav">
+      <button class="nav-item active" data-tab="dashboard" onclick="navTo('dashboard')">
+        <span class="icon">&#127968;</span>Home
+      </button>
+      <button class="nav-item" data-tab="modules" onclick="navTo('modules')">
+        <span class="icon">&#128196;</span>Modules
+      </button>
+      <button class="nav-item" data-tab="admin" id="nav-admin" onclick="navTo('admin')">
+        <span class="icon">&#128101;</span>Admin
+      </button>
+      <button class="nav-item" data-tab="profile" onclick="navTo('profile')">
+        <span class="icon">&#128100;</span>Profile
+      </button>
+    </nav>
+
+    <button class="fab hidden" id="fab" onclick="fabAction()">+</button>
+  </div><!-- screen-app -->
+</div><!-- #app -->
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+
+// ── State ──────────────────────────────────────────────────────────────────
+const S = {
+  token: localStorage.getItem('sa_token') || '',
+  role: localStorage.getItem('sa_role') || '',
+  fullName: localStorage.getItem('sa_fullName') || '',
+  currentNav: 'dashboard',
+  currentModule: null,
+  moduleFields: {},
+  records: [],
+  editRecord: null,
+  dashData: null,
+};
+
+// ── API ────────────────────────────────────────────────────────────────────
+const API = {
+  h() { return { 'Content-Type':'application/json', 'Authorization':'Bearer '+S.token }; },
+  async req(method, path, body) {
+    const opts = { method, headers: this.h() };
+    if (body) opts.body = JSON.stringify(body);
+    const r = await fetch(path, opts);
+    if (r.status === 401) { logout(); return null; }
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({}));
+      throw new Error(e.detail || r.statusText);
+    }
+    return r.json();
+  },
+  login(u, p) {
+    const fd = new URLSearchParams(); fd.append('username',u); fd.append('password',p);
+    return fetch('/token',{method:'POST',body:fd}).then(async r=>{
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.detail||'Login failed');
+      return d;
+    });
+  },
+  dashboard()      { return this.req('GET','/dashboard'); },
+  reminders()      { return this.req('GET','/reminders'); },
+  modules()        { return this.req('GET','/modules'); },
+  records(mod,q)   { return this.req('GET',`/records/${mod}`+(q?`?q=${encodeURIComponent(q)}`:'')); },
+  create(data)     { return this.req('POST','/records',data); },
+  update(id,data)  { return this.req('PUT',`/records/${id}`,data); },
+  del(id)          { return this.req('DELETE',`/records/${id}`); },
+  users()          { return this.req('GET','/admin/users'); },
+  audit(mod,usr)   { let p='/admin/audit?limit=100';if(mod)p+=`&module=${mod}`;if(usr)p+=`&username=${usr}`;return this.req('GET',p); },
+  deactivate(u)    { return this.req('POST',`/admin/users/${u}/deactivate`); },
+  activate(u)      { return this.req('POST',`/admin/users/${u}/activate`); },
+  saveUser(d)      { return this.req('POST','/admin/user',d); },
+  chgPwd(cur,nw)   { return this.req('PUT','/users/me/password',{current_password:cur,new_password:nw}); },
+  search(q)        { return this.req('GET',`/search?q=${encodeURIComponent(q)}`); },
+};
+
+// ── Toast ──────────────────────────────────────────────────────────────────
+let _tid;
+function toast(msg, dur=2800) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(_tid); _tid = setTimeout(()=>t.classList.remove('show'), dur);
+}
+
+// ── Auth ───────────────────────────────────────────────────────────────────
+function logout() {
+  localStorage.removeItem('sa_token'); localStorage.removeItem('sa_role'); localStorage.removeItem('sa_fullName');
+  S.token=''; S.role=''; S.fullName='';
+  showScreen('login');
+}
+
+async function doLogin() {
+  const u = document.getElementById('inp-user').value.trim();
+  const p = document.getElementById('inp-pass').value;
+  const err = document.getElementById('login-err');
+  if (!u||!p){ err.textContent='Enter username and password.'; return; }
+  const btn = document.getElementById('btn-login');
+  btn.disabled=true; btn.textContent='Signing in…'; err.textContent='';
+  try {
+    const d = await API.login(u,p);
+    S.token=d.access_token; S.role=d.role; S.fullName=d.full_name;
+    localStorage.setItem('sa_token',S.token);
+    localStorage.setItem('sa_role',S.role);
+    localStorage.setItem('sa_fullName',S.fullName);
+    showScreen('app');
+    if (d.must_change_password) { navTo('profile'); toast('Please change your password.', 4000); }
+    else initApp();
+  } catch(e){ err.textContent=e.message; }
+  finally{ btn.disabled=false; btn.textContent='Sign In'; }
+}
+
+// ── Screen switching ───────────────────────────────────────────────────────
+function showScreen(name) {
+  document.querySelectorAll('.screen[id^="screen-"]').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen-'+name).classList.add('active');
+}
+
+// ── Navigation ─────────────────────────────────────────────────────────────
+const NAV_TABS = ['dashboard','modules','records','form','admin','profile','search'];
+function showTab(name) {
+  NAV_TABS.forEach(t=>{ const el=document.getElementById('tab-'+t); if(el) el.classList.remove('active'); });
+  const el = document.getElementById('tab-'+name);
+  if (el) el.classList.add('active');
+  document.querySelectorAll('#nav .nav-item').forEach(n=>n.classList.toggle('active', n.dataset.tab===name));
+}
+
+function navTo(name) {
+  S.currentNav = name;
+  showTab(name);
+  document.getElementById('btn-back').style.display = 'none';
+  document.getElementById('fab').classList.add('hidden');
+  document.getElementById('search-bar').style.display = 'none';
+  document.getElementById('btn-search-toggle').style.display = '';
+
+  const titles = {dashboard:'Dashboard',modules:'Modules',admin:'Admin',profile:'Profile',search:'Search Results'};
+  document.getElementById('page-title').textContent = titles[name] || name;
+
+  if (name==='dashboard') loadDashboard();
+  else if (name==='modules') loadModules();
+  else if (name==='admin') { loadAdminUsers(); adminTab('users'); }
+  else if (name==='profile') {
+    document.getElementById('prof-name').textContent = S.fullName;
+    document.getElementById('prof-role').textContent = S.role;
+  }
+}
+
+function openModule(mod) {
+  S.currentModule = mod;
+  S.editRecord = null;
+  showTab('records');
+  document.getElementById('page-title').textContent = cap(mod);
+  document.getElementById('btn-back').style.display = '';
+  document.getElementById('fab').classList.remove('hidden');
+  document.getElementById('btn-search-toggle').style.display = '';
+  loadRecords();
+}
+
+function openForm(record) {
+  S.editRecord = record || null;
+  showTab('form');
+  document.getElementById('page-title').textContent = record ? 'Edit Record' : 'New Record';
+  document.getElementById('btn-back').style.display = '';
+  document.getElementById('fab').classList.add('hidden');
+  document.getElementById('btn-search-toggle').style.display = 'none';
+  renderForm();
+}
+
+function fabAction() { openForm(null); }
+
+function goBack() {
+  const cur = NAV_TABS.find(t=>document.getElementById('tab-'+t).classList.contains('active'));
+  if (cur==='form') { openModule(S.currentModule); return; }
+  if (cur==='records') { navTo('modules'); return; }
+  navTo('dashboard');
+}
+
+// ── Dashboard ──────────────────────────────────────────────────────────────
+async function loadDashboard() {
+  document.getElementById('dash-content').innerHTML = '<div class="loading"><div class="spinner"></div><br>Loading…</div>';
+  try {
+    const [dash, rem] = await Promise.all([API.dashboard(), API.reminders().catch(()=>({}))]);
+    S.dashData = dash;
+    renderDashboard(dash, rem);
+  } catch(e){ document.getElementById('dash-content').innerHTML = `<div class="empty"><div class="ico">⚠️</div><p>${e.message}</p></div>`; }
+}
+
+function renderDashboard(d, r={}) {
+  const ol = r.overdue_leads||[]; const ul = r.upcoming_leads||[]; const oa = r.overdue_ar||[];
+  let h = `<div class="card">
+    <div class="card-header">Overview</div>
+    <div class="stat-grid">
+      <div class="stat-cell${(d.open_leads||0)>0?' warn':''}">
+        <div class="stat-val">${d.open_leads||0}</div><div class="stat-lbl">Open Leads</div>
+      </div>
+      <div class="stat-cell${(d.overdue_ar||0)>0?' danger':''}">
+        <div class="stat-val">${d.overdue_ar||0}</div><div class="stat-lbl">Overdue AR</div>
+      </div>
+      <div class="stat-cell${(d.open_complaints||0)>0?' warn':''}">
+        <div class="stat-val">${d.open_complaints||0}</div><div class="stat-lbl">Open Complaints</div>
+      </div>
+      <div class="stat-cell${(d.open_exceptions||0)>0?' warn':''}">
+        <div class="stat-val">${d.open_exceptions||0}</div><div class="stat-lbl">Open Exceptions</div>
+      </div>
+    </div>
+  </div>`;
+
+  // Module counts
+  if (d.counts && Object.keys(d.counts).length) {
+    h += '<div class="section-label">Modules</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 14px 4px">';
+    for (const [mod, cnt] of Object.entries(d.counts)) {
+      h += `<div class="mod-card" onclick="openModule('${mod}')">
+        <div class="mod-icon">${modIcon(mod)}</div>
+        <div class="mod-name">${cap(mod)}</div>
+        <div class="mod-count">${cnt}</div>
+      </div>`;
+    }
+    h += '</div>';
+  }
+
+  // Reminders
+  if (ol.length || ul.length || oa.length) {
+    h += '<div class="card"><div class="card-header">Reminders</div>';
+    if (ol.length) {
+      h += '<div class="rem-section"><div class="rem-title">&#128680; Overdue Leads</div>';
+      ol.slice(0,5).forEach(x=>{ h+=`<div class="rem-pill danger" onclick="openModule('leads')"><span class="rem-pill-text">${esc(x.title||x.code||'Lead')}</span><span class="rem-pill-date">${x.next_action_date||''}</span></div>`; });
+      h += '</div>';
+    }
+    if (ul.length) {
+      h += '<div class="rem-section"><div class="rem-title">&#128197; Due This Week</div>';
+      ul.slice(0,5).forEach(x=>{ h+=`<div class="rem-pill" onclick="openModule('leads')"><span class="rem-pill-text">${esc(x.title||x.code||'Lead')}</span><span class="rem-pill-date">${x.next_action_date||''}</span></div>`; });
+      h += '</div>';
+    }
+    if (oa.length) {
+      h += '<div class="rem-section"><div class="rem-title">&#128181; Overdue AR</div>';
+      oa.slice(0,5).forEach(x=>{ h+=`<div class="rem-pill danger" onclick="openModule('ar')"><span class="rem-pill-text">${esc(x.title||x.code||'Invoice')}</span><span class="rem-pill-date">${x.due_date||''}</span></div>`; });
+      h += '</div>';
+    }
+    h += '</div>';
+  }
+
+  document.getElementById('dash-content').innerHTML = h || '<div class="empty"><div class="ico">&#128202;</div><p>No data yet.</p></div>';
+}
+
+// ── Modules ────────────────────────────────────────────────────────────────
+async function loadModules() {
+  const g = document.getElementById('module-grid');
+  g.innerHTML = '<div class="loading" style="grid-column:1/-1"><div class="spinner"></div></div>';
+  try {
+    const d = await API.modules();
+    S.moduleFields = d.modules;
+    let h = '';
+    for (const mod of Object.keys(d.modules)) {
+      const cnt = (S.dashData?.counts||{})[mod] ?? '';
+      h += `<div class="mod-card" onclick="openModule('${mod}')">
+        <div class="mod-icon">${modIcon(mod)}</div>
+        <div class="mod-name">${cap(mod)}</div>
+        ${cnt!==''?`<div class="mod-count">${cnt}</div>`:''}
+      </div>`;
+    }
+    g.innerHTML = h;
+  } catch(e){ g.innerHTML=`<div class="empty" style="grid-column:1/-1"><p>${e.message}</p></div>`; }
+}
+
+// ── Records ────────────────────────────────────────────────────────────────
+async function loadRecords(q='') {
+  document.getElementById('records-content').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    S.records = await API.records(S.currentModule, q);
+    renderRecordList(S.records);
+  } catch(e){ document.getElementById('records-content').innerHTML=`<div class="empty"><div class="ico">⚠️</div><p>${e.message}</p></div>`; }
+}
+
+function renderRecordList(records) {
+  if (!records.length) {
+    document.getElementById('records-content').innerHTML='<div class="empty"><div class="ico">&#128193;</div><p>No records found.</p></div>';
+    return;
+  }
+  const fields = S.moduleFields[S.currentModule] || [];
+  const subField = fields[2] || fields[1] || '';
+  let h = '<div class="card" style="margin-top:10px">';
+  records.forEach(r=>{
+    const title = r.title || r.code || '—';
+    const sub = subField ? (r.data[subField]||'') : (r.updated_at?r.updated_at.slice(0,10):'');
+    const avatar = title.trim()[0]?.toUpperCase()||'?';
+    h += `<div class="list-item" onclick="openForm(${JSON.stringify(r).replace(/"/g,'&quot;')})">
+      <div class="item-avatar">${avatar}</div>
+      <div class="item-body"><div class="item-title">${esc(title)}</div>${sub?`<div class="item-sub">${esc(String(sub))}</div>`:''}</div>
+      <div class="item-arrow">›</div>
+    </div>`;
+  });
+  h += '</div>';
+  document.getElementById('records-content').innerHTML = h;
+}
+
+// ── Record Form ────────────────────────────────────────────────────────────
+const DATE_FIELDS = /Date|date/;
+const BOOL_FIELDS = /\?$/;
+const SELECT_FIELDS = {
+  'Lead Status':['New','Contacted','Proposal','Negotiation','Closed-Won','Closed-Lost','Dormant'],
+  'Priority':['Low','Medium','High','Urgent'],
+  'Quote Status':['Draft','Sent','Negotiating','Accepted','Rejected','Expired'],
+  'Payment Status':['Unpaid','Partial','Paid','Overdue','Waived'],
+  'AR Stage':['Invoiced','Reminded','Escalated','Legal','Written Off'],
+  'Severity':['Low','Medium','High','Critical'],
+  'Status':['Open','In Progress','Resolved','Closed'],
+  'Currency':['USD','PHP','SGD','AUD','EUR','GBP'],
+};
+
+function renderForm() {
+  const fields = S.moduleFields[S.currentModule] || [];
+  const data = S.editRecord?.data || {};
+  const isEdit = !!S.editRecord;
+  const canWrite = S.role === 'Owner' || S.role === 'Business Manager' || S.role === 'Sales Agent' || S.role === 'Ticketing Officer' || S.role === 'Finance Officer';
+
+  let h = '';
+  // Group fields into rows of 2 for short fields, full width for long ones
+  const longFields = ['Notes','Remarks','Comments','Corrective Action','Root Cause','Resolution','Performance Notes','Billing Address'];
+
+  for (let i=0; i<fields.length;) {
+    const f = fields[i];
+    const isLong = longFields.some(l=>f.includes(l));
+    if (isLong) {
+      h += `<div class="form-group"><label>${esc(f)}</label><textarea id="ff_${i}" ${!canWrite?'readonly':''}>${esc(data[f]||'')}</textarea></div>`;
+      i++;
+    } else if (SELECT_FIELDS[f]) {
+      const cur = data[f]||'';
+      h += `<div class="form-group"><label>${esc(f)}</label><select id="ff_${i}" ${!canWrite?'disabled':''}>`;
+      h += `<option value=""></option>`;
+      SELECT_FIELDS[f].forEach(o=>h+=`<option${o===cur?' selected':''}>${esc(o)}</option>`);
+      h += `</select></div>`;
+      i++;
+    } else if (BOOL_FIELDS.test(f)) {
+      const cur = data[f]||'';
+      h += `<div class="form-group"><label>${esc(f)}</label><select id="ff_${i}" ${!canWrite?'disabled':''}><option value=""></option><option${cur==='Yes'?' selected':''}>Yes</option><option${cur==='No'?' selected':''}>No</option></select></div>`;
+      i++;
+    } else {
+      // Pair with next non-long field if available
+      const f2 = fields[i+1];
+      const isLong2 = f2 && longFields.some(l=>f2.includes(l));
+      if (f2 && !isLong2 && !SELECT_FIELDS[f2] && !BOOL_FIELDS.test(f2)) {
+        h += `<div class="form-row">`;
+        h += fieldInput(f, i, data, canWrite);
+        h += fieldInput(f2, i+1, data, canWrite);
+        h += `</div>`;
+        i += 2;
+      } else {
+        h += fieldInput(f, i, data, canWrite);
+        i++;
+      }
+    }
+  }
+
+  if (canWrite) {
+    h += `<div class="btn-row">
+      <button class="btn btn-success" onclick="saveRecord()">${isEdit?'&#128190; Save':'&#10133; Create'}</button>
+      ${isEdit?`<button class="btn btn-danger btn-sm" onclick="deleteRecord()">&#128465;</button>`:''}
+    </div>`;
+  }
+
+  document.getElementById('form-content').innerHTML = h;
+  document.getElementById('form-content').scrollTop = 0;
+}
+
+function fieldInput(f, idx, data, canWrite) {
+  const type = DATE_FIELDS.test(f) ? 'date' : 'text';
+  const val = data[f] ? (type==='date'?String(data[f]).slice(0,10):data[f]) : '';
+  return `<div class="form-group"><label>${esc(f)}</label><input id="ff_${idx}" type="${type}" value="${esc(String(val))}" ${!canWrite?'readonly':''}></div>`;
+}
+
+async function saveRecord() {
+  const fields = S.moduleFields[S.currentModule] || [];
+  const formData = {};
+  fields.forEach((f,i)=>{
+    const el = document.getElementById('ff_'+i);
+    if (el) formData[f] = el.value;
+  });
+  const codeField = fields[0] || 'code';
+  const code = formData[codeField] || '';
+  const title = formData['Client Name'] || formData['Company'] || formData['Supplier Name'] || code;
+  const payload = { module: S.currentModule, code, title, data: formData };
+  if (S.editRecord?.version != null) payload.version = S.editRecord.version;
+
+  try {
+    if (S.editRecord?.id) {
+      await API.update(S.editRecord.id, payload);
+      toast('Record updated.');
+    } else {
+      await API.create(payload);
+      toast('Record created.');
+    }
+    openModule(S.currentModule);
+  } catch(e){ toast('Error: '+e.message, 4000); }
+}
+
+async function deleteRecord() {
+  if (!S.editRecord?.id) return;
+  if (!confirm('Move this record to trash?')) return;
+  try {
+    await API.del(S.editRecord.id);
+    toast('Moved to trash.');
+    openModule(S.currentModule);
+  } catch(e){ toast('Error: '+e.message, 4000); }
+}
+
+// ── Admin ──────────────────────────────────────────────────────────────────
+function adminTab(name) {
+  document.querySelectorAll('#tab-admin .tab').forEach(t=>t.classList.toggle('active', t.dataset.atab===name));
+  document.getElementById('admin-users-pane').style.display = name==='users'?'':'none';
+  document.getElementById('admin-audit-pane').style.display = name==='audit'?'':'none';
+  document.getElementById('admin-newuser-pane').style.display = name==='newuser'?'':'none';
+  if (name==='audit') loadAudit();
+}
+
+async function loadAdminUsers() {
+  if (S.role!=='Owner'&&S.role!=='Business Manager') {
+    document.getElementById('admin-users-pane').innerHTML='<div class="empty"><p>Not authorized.</p></div>';
+    return;
+  }
+  document.getElementById('admin-users-pane').innerHTML='<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const users = await API.users();
+    let h = '<div class="table-wrap"><table class="data-table"><tr><th>User</th><th>Role</th><th>Status</th><th></th></tr>';
+    users.forEach(u=>{
+      const active = u.is_active;
+      h += `<tr>
+        <td><b>${esc(u.username)}</b><br><small style="color:var(--gray)">${esc(u.full_name)}</small></td>
+        <td><span class="badge badge-blue">${esc(u.role)}</span></td>
+        <td><span class="badge ${active?'badge-green':'badge-red'}">${active?'Active':'Inactive'}</span></td>
+        <td>${active
+          ?`<button class="btn btn-danger btn-sm" onclick="toggleUser('${esc(u.username)}',false)">Deactivate</button>`
+          :`<button class="btn btn-success btn-sm" onclick="toggleUser('${esc(u.username)}',true)">Activate</button>`
+        }</td>
+      </tr>`;
+    });
+    h += '</table></div>';
+    document.getElementById('admin-users-pane').innerHTML = h;
+  } catch(e){ document.getElementById('admin-users-pane').innerHTML=`<div class="empty"><p>${e.message}</p></div>`; }
+}
+
+async function toggleUser(username, activate) {
+  try {
+    if (activate) await API.activate(username);
+    else await API.deactivate(username);
+    toast(activate?'User activated.':'User deactivated.');
+    loadAdminUsers();
+  } catch(e){ toast('Error: '+e.message, 4000); }
+}
+
+async function loadAudit() {
+  document.getElementById('admin-audit-pane').innerHTML='<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const rows = await API.audit();
+    if (!rows.length){ document.getElementById('admin-audit-pane').innerHTML='<div class="empty"><p>No audit entries.</p></div>'; return; }
+    let h='<div class="table-wrap"><table class="data-table"><tr><th>Time</th><th>User</th><th>Action</th><th>Module</th></tr>';
+    rows.forEach(r=>{
+      h+=`<tr><td style="white-space:nowrap">${(r.created_at||'').slice(0,16)}</td><td>${esc(r.username||'')}</td><td>${esc(r.action)}</td><td>${esc(r.module||'')}</td></tr>`;
+    });
+    h+='</table></div>';
+    document.getElementById('admin-audit-pane').innerHTML=h;
+  } catch(e){ document.getElementById('admin-audit-pane').innerHTML=`<div class="empty"><p>${e.message}</p></div>`; }
+}
+
+async function saveNewUser() {
+  const u=document.getElementById('nu-user').value.trim();
+  const n=document.getElementById('nu-name').value.trim();
+  const r=document.getElementById('nu-role').value;
+  const p=document.getElementById('nu-pass').value;
+  if(!u||!p){ toast('Username and password required.'); return; }
+  try {
+    await API.saveUser({username:u,full_name:n,role:r,new_password:p});
+    toast('User saved.');
+    document.getElementById('nu-user').value='';
+    document.getElementById('nu-name').value='';
+    document.getElementById('nu-pass').value='';
+    loadAdminUsers(); adminTab('users');
+  } catch(e){ toast('Error: '+e.message, 4000); }
+}
+
+// ── Password change ────────────────────────────────────────────────────────
+async function changePassword() {
+  const cur=document.getElementById('cp-cur').value;
+  const nw=document.getElementById('cp-new').value;
+  const cf=document.getElementById('cp-conf').value;
+  if(nw!==cf){ toast('New passwords do not match.'); return; }
+  if(nw.length<8){ toast('Password must be at least 8 characters.'); return; }
+  try {
+    await API.chgPwd(cur, nw);
+    toast('Password updated.');
+    document.getElementById('cp-cur').value='';
+    document.getElementById('cp-new').value='';
+    document.getElementById('cp-conf').value='';
+  } catch(e){ toast('Error: '+e.message, 4000); }
+}
+
+// ── Search ─────────────────────────────────────────────────────────────────
+let _searchTimer;
+function doSearch(q) {
+  clearTimeout(_searchTimer);
+  if (!q || q.length < 2) {
+    document.getElementById('search-results').innerHTML='<div class="empty"><div class="ico">&#128269;</div><p>Type at least 2 characters…</p></div>';
+    return;
+  }
+  document.getElementById('search-results').innerHTML='<div class="loading"><div class="spinner"></div></div>';
+  _searchTimer = setTimeout(async ()=>{
+    try {
+      const res = await API.search(q);
+      if (!res.length){ document.getElementById('search-results').innerHTML='<div class="empty"><p>No results for "'+esc(q)+'"</p></div>'; return; }
+      let h='<div class="card" style="margin-top:10px">';
+      res.forEach(r=>{
+        h+=`<div class="list-item" onclick="openModuleRecord('${r.module}',${JSON.stringify(r).replace(/"/g,'&quot;')})">
+          <div class="item-avatar" style="background:#f3e5f5;color:#6a1b9a">${(r.title||'?')[0].toUpperCase()}</div>
+          <div class="item-body">
+            <div class="item-title">${esc(r.title||r.code||'Record')}</div>
+            <div class="item-sub"><span class="badge badge-blue">${esc(r.module)}</span> ${esc(r.code||'')}</div>
+          </div>
+          <div class="item-arrow">›</div>
+        </div>`;
+      });
+      h+='</div>';
+      document.getElementById('search-results').innerHTML=h;
+    } catch(e){ document.getElementById('search-results').innerHTML=`<div class="empty"><p>${e.message}</p></div>`; }
+  }, 350);
+}
+
+function openModuleRecord(mod, record) {
+  S.currentModule = mod;
+  openForm(record);
+  document.getElementById('search-bar').style.display='none';
+}
+
+// ── Toggle search bar ──────────────────────────────────────────────────────
+function toggleSearch() {
+  const bar = document.getElementById('search-bar');
+  const inp = document.getElementById('inp-search');
+  const isHidden = bar.style.display==='none'||!bar.style.display;
+  bar.style.display = isHidden?'':'none';
+  if (isHidden) {
+    inp.value='';
+    showTab('search');
+    document.getElementById('search-results').innerHTML='<div class="empty"><div class="ico">&#128269;</div><p>Type to search…</p></div>';
+    inp.focus();
+  } else {
+    showTab(S.currentNav);
+  }
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function cap(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function modIcon(m){
+  return {leads:'🎯',quotations:'📋',bookings:'✈️',ar:'💰',complaints:'⚠️',exceptions:'🔁',clients:'👥',suppliers:'🏭'}[m]||'📁';
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+function initApp() {
+  // Show/hide admin nav
+  const adminRoles = ['Owner','Business Manager'];
+  document.getElementById('nav-admin').style.display = adminRoles.includes(S.role)?'':'none';
+  navTo('dashboard');
+}
+
+// ── Event bindings ─────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', ()=>{
+  document.getElementById('btn-login').addEventListener('click', doLogin);
+  document.getElementById('inp-pass').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+  document.getElementById('inp-user').addEventListener('keydown', e=>{ if(e.key==='Enter') document.getElementById('inp-pass').focus(); });
+  document.getElementById('btn-back').addEventListener('click', goBack);
+  document.getElementById('btn-search-toggle').addEventListener('click', toggleSearch);
+  document.getElementById('btn-refresh').addEventListener('click', ()=>{
+    const active = NAV_TABS.find(t=>document.getElementById('tab-'+t).classList.contains('active'));
+    if(active==='dashboard') loadDashboard();
+    else if(active==='records') loadRecords();
+    else if(active==='admin') loadAdminUsers();
+  });
+  document.getElementById('inp-search').addEventListener('input', e=>doSearch(e.target.value));
+
+  if (S.token) { showScreen('app'); initApp(); }
+  else showScreen('login');
+});
+</script>
+</body>
+</html>

@@ -9,7 +9,9 @@ from typing import Optional, Dict, Any, List
 
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.staticfiles import StaticFiles
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel
@@ -269,9 +271,22 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="SA-US ERP Local Network Server", version="2.2.0", lifespan=lifespan)
+app = FastAPI(title="SA-US ERP Local Network Server", version="2.3.0", lifespan=lifespan)
 _cors_origins = [o.strip() for o in config.get("server", "cors_origins", fallback="http://127.0.0.1,http://localhost").split(",") if o.strip()]
 app.add_middleware(CORSMiddleware, allow_origins=_cors_origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+
+_static_dir = BASE_DIR / "static"
+_static_dir.mkdir(exist_ok=True)
+app.mount("/static", StaticFiles(directory=str(_static_dir)), name="static")
+
+
+@app.get("/ui", response_class=HTMLResponse)
+@app.get("/ui/{path:path}", response_class=HTMLResponse)
+def serve_ui():
+    ui_file = _static_dir / "index.html"
+    if not ui_file.exists():
+        raise HTTPException(404, "Web UI not found")
+    return HTMLResponse(content=ui_file.read_text(encoding="utf-8"))
 
 
 @app.get("/health")
