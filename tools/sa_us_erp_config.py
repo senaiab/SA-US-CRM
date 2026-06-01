@@ -35,7 +35,7 @@ def parse_database_url(url):
         "port": "3306",
         "database": "sa_us_erp",
         "username": "sa_us_user",
-        "password": "SAUSERP2026!",
+        "password": "CHANGE_THIS_DB_PASSWORD",
     }
     prefix = "mysql+pymysql://"
     suffix = "?charset=utf8mb4"
@@ -70,15 +70,11 @@ def build_database_url(host, port, database, username, password):
 def read_server_config():
     config = configparser.ConfigParser()
     config.read(SERVER_CONFIG)
-    db_url = config.get(
-        "database",
-        "url",
-        fallback="mysql+pymysql://sa_us_user:SAUSERP2026!@127.0.0.1:3306/sa_us_erp?charset=utf8mb4",
-    )
+    db_url = config.get("database", "url", fallback="")
     db = parse_database_url(db_url)
     return {
-        "host": config.get("server", "host", fallback="0.0.0.0"),
-        "port": config.get("server", "port", fallback="8080"),
+        "host_server": config.get("server", "host", fallback="0.0.0.0"),
+        "port_server": config.get("server", "port", fallback="8080"),
         "secret_key": config.get("server", "secret_key", fallback=""),
         **db,
     }
@@ -281,8 +277,8 @@ class ConfigApp(Tk):
     def build_server_tab(self, parent):
         cfg = read_server_config()
         fields = [
-            ("host_server", "Server bind host", cfg["host"]),
-            ("port_server", "Server port", cfg["port"]),
+            ("host_server", "Server bind host", cfg["host_server"]),
+            ("port_server", "Server port", cfg["port_server"]),
             ("host_db", "Database host", cfg["host"]),
             ("port_db", "Database port", cfg["port"]),
             ("database", "Database name", cfg["database"]),

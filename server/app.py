@@ -13,7 +13,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, JSON, Text, func, or_, text
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, JSON, Text, func, or_, text, Boolean
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 from sqlalchemy.exc import OperationalError
 
@@ -21,7 +21,7 @@ BASE_DIR = Path(__file__).resolve().parent
 config = configparser.ConfigParser()
 config.read(BASE_DIR / "server_config.ini")
 
-DATABASE_URL = config.get("database", "url", fallback="mysql+pymysql://sa_us_user:SAUSERP2026!@127.0.0.1:3306/sa_us_erp?charset=utf8mb4")
+DATABASE_URL = config.get("database", "url", fallback="")
 _secret = config.get("server", "secret_key", fallback="")
 if not _secret or _secret == "CHANGE_THIS_TO_A_RANDOM_SECRET":
     import secrets as _secrets
@@ -35,6 +35,7 @@ ACCESS_TOKEN_EXPIRE_HOURS = 10
 _RATE_WINDOW = 300
 _RATE_MAX = 5
 _login_failures: dict = defaultdict(list)
+_admin_write_attempts: dict = defaultdict(list)
 _database_error: Optional[str] = None
 
 
@@ -57,6 +58,7 @@ class User(Base):
     role = Column(String(50), nullable=False, default="Sales Agent")
     password_hash = Column(String(255), nullable=False)
     is_active = Column(Integer, nullable=False, default=1)
+    must_change_password = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime, default=utcnow)
 
 
@@ -71,6 +73,8 @@ class CRMRecord(Base):
     updated_by = Column(String(80), nullable=True)
     created_at = Column(DateTime, default=utcnow)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
+    version = Column(Integer, nullable=False, default=1)
+    deleted_at = Column(DateTime, nullable=True, default=None)
 
 
 class AuditLog(Base):
@@ -89,6 +93,7 @@ class Token(BaseModel):
     token_type: str
     role: str
     full_name: str
+    must_change_password: bool = False
 
 
 class RecordIn(BaseModel):
@@ -96,6 +101,7 @@ class RecordIn(BaseModel):
     code: Optional[str] = None
     title: Optional[str] = None
     data: Dict[str, Any]
+    version: Optional[int] = None
 
 
 class RecordOut(BaseModel):
@@ -108,6 +114,7 @@ class RecordOut(BaseModel):
     updated_by: Optional[str]
     created_at: datetime
     updated_at: datetime
+    version: int = 1
 
 
 class PasswordChange(BaseModel):
@@ -214,14 +221,35 @@ def _record_failure(username: str):
     _login_failures[username].append(time.time())
 
 
+def _check_admin_rate_limit(username: str):
+    now = time.time()
+    recent = [t for t in _admin_write_attempts[username] if now - t < _RATE_WINDOW]
+    _admin_write_attempts[username] = recent
+    if len(recent) >= 20:
+        raise HTTPException(status_code=429, detail="Too many admin operations. Wait 5 minutes.")
+    _admin_write_attempts[username].append(now)
+
+
 def initialize_database():
     global _database_error
     try:
         Base.metadata.create_all(bind=engine)
+        with engine.connect() as conn:
+            for col, definition in [
+                ("must_change_password", "INT NOT NULL DEFAULT 0"),
+                ("version", "INT NOT NULL DEFAULT 1"),
+                ("deleted_at", "DATETIME NULL DEFAULT NULL"),
+            ]:
+                table = "users" if col == "must_change_password" else "crm_records"
+                try:
+                    conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} {definition}"))
+                    conn.commit()
+                except Exception:
+                    conn.rollback()
         db = SessionLocal()
         try:
             if not db.query(User).filter(User.username == "admin").first():
-                db.add(User(username="admin", full_name="System Administrator", role="Owner", password_hash=get_password_hash("admin123")))
+                db.add(User(username="admin", full_name="System Administrator", role="Owner", password_hash=get_password_hash("admin123"), must_change_password=1))
                 db.commit()
         finally:
             db.close()
@@ -242,7 +270,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="SA-US ERP Local Network Server", version="2.2.0", lifespan=lifespan)
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+_cors_origins = [o.strip() for o in config.get("server", "cors_origins", fallback="http://127.0.0.1,http://localhost").split(",") if o.strip()]
+app.add_middleware(CORSMiddleware, allow_origins=_cors_origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 
 @app.get("/health")
@@ -268,7 +297,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
         raise HTTPException(status_code=400, detail="Incorrect username or password")
     _login_failures.pop(form_data.username, None)
     token = create_access_token(data={"sub": user.username, "role": user.role})
-    return {"access_token": token, "token_type": "bearer", "role": user.role, "full_name": user.full_name}
+    return {"access_token": token, "token_type": "bearer", "role": user.role, "full_name": user.full_name, "must_change_password": bool(user.must_change_password)}
 
 
 @app.get("/modules")
@@ -282,7 +311,7 @@ def list_records(module: str, q: str = "", user: User = Depends(get_current_user
         raise HTTPException(404, "Unknown module")
     if not can_access(user, module, write=False):
         raise HTTPException(403, "Not allowed")
-    query = db.query(CRMRecord).filter(CRMRecord.module == module)
+    query = db.query(CRMRecord).filter(CRMRecord.module == module, CRMRecord.deleted_at == None)
     if q:
         pattern = f"%{q}%"
         query = query.filter(
@@ -315,16 +344,19 @@ def create_record(record: RecordIn, user: User = Depends(get_current_user), db: 
 
 @app.put("/records/{record_id}", response_model=RecordOut)
 def update_record(record_id: int, record: RecordIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    db_record = db.query(CRMRecord).filter(CRMRecord.id == record_id).first()
+    db_record = db.query(CRMRecord).filter(CRMRecord.id == record_id, CRMRecord.deleted_at == None).first()
     if not db_record:
         raise HTTPException(404, "Record not found")
     if not can_access(user, db_record.module, write=True):
         raise HTTPException(403, "Not allowed")
+    if record.version is not None and record.version != db_record.version:
+        raise HTTPException(409, "Record was modified by another user. Reload and try again.")
     db_record.code = record.code
     db_record.title = record.title
     db_record.data = record.data
     db_record.updated_by = user.username
     db_record.updated_at = utcnow()
+    db_record.version = (db_record.version or 1) + 1
     audit(db, user.username, "update", db_record.module, db_record.id)
     db.commit()
     db.refresh(db_record)
@@ -333,16 +365,38 @@ def update_record(record_id: int, record: RecordIn, user: User = Depends(get_cur
 
 @app.delete("/records/{record_id}")
 def delete_record(record_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    db_record = db.query(CRMRecord).filter(CRMRecord.id == record_id).first()
+    db_record = db.query(CRMRecord).filter(CRMRecord.id == record_id, CRMRecord.deleted_at == None).first()
     if not db_record:
         raise HTTPException(404, "Record not found")
     if user.role not in ["Owner", "Business Manager"]:
         raise HTTPException(403, "Only Owner or Business Manager can delete records")
-    module = db_record.module
-    db.delete(db_record)
-    audit(db, user.username, "delete", module, record_id)
+    db_record.deleted_at = utcnow()
+    audit(db, user.username, "delete", db_record.module, record_id)
     db.commit()
     return {"ok": True}
+
+
+@app.get("/trash/{module}", response_model=List[RecordOut])
+def list_trash(module: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if module not in MODULES:
+        raise HTTPException(404, "Unknown module")
+    if user.role not in ["Owner", "Business Manager"]:
+        raise HTTPException(403, "Not allowed")
+    return db.query(CRMRecord).filter(CRMRecord.module == module, CRMRecord.deleted_at != None).order_by(CRMRecord.deleted_at.desc()).all()
+
+
+@app.post("/records/{record_id}/restore", response_model=RecordOut)
+def restore_record(record_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    db_record = db.query(CRMRecord).filter(CRMRecord.id == record_id, CRMRecord.deleted_at != None).first()
+    if not db_record:
+        raise HTTPException(404, "Deleted record not found")
+    if user.role not in ["Owner", "Business Manager"]:
+        raise HTTPException(403, "Not allowed")
+    db_record.deleted_at = None
+    audit(db, user.username, "restore", db_record.module, record_id)
+    db.commit()
+    db.refresh(db_record)
+    return db_record
 
 
 def _dashboard_sql_metrics(db: Session) -> dict:
@@ -375,8 +429,8 @@ def _dashboard_sql_metrics(db: Session) -> dict:
         "  JSON_UNQUOTE(JSON_EXTRACT(data, '$. \"Amount Received\"')) "
         "FROM crm_records WHERE module='ar' "
         "AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(data, '$. \"Payment Status\"')), '') != 'Paid' "
-        f"AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(data, '$. \"Due Date\"')), '') < '{today_str}'"
-    )).fetchall()
+        "AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(data, '$. \"Due Date\"')), '') < :today"
+    ), {"today": today_str}).fetchall()
     overdue_ar = 0
     for inv_str, paid_str in ar_rows:
         try:
@@ -432,9 +486,11 @@ def _dashboard_python_metrics(db: Session) -> dict:
 
 @app.get("/dashboard")
 def dashboard(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    # SQL aggregate counts — no full table scan
-    count_rows = db.query(CRMRecord.module, func.count(CRMRecord.id)).group_by(CRMRecord.module).all()
-    counts = {m: 0 for m in MODULES}
+    accessible = [m for m in MODULES if can_access(user, m, write=False)]
+    count_rows = db.query(CRMRecord.module, func.count(CRMRecord.id)).filter(
+        CRMRecord.module.in_(accessible)
+    ).group_by(CRMRecord.module).all()
+    counts = {m: 0 for m in accessible}
     for module, cnt in count_rows:
         if module in counts:
             counts[module] = cnt
@@ -458,6 +514,7 @@ def change_own_password(
     if not verify_password(payload.current_password, user.password_hash):
         raise HTTPException(status_code=400, detail="Current password is incorrect.")
     user.password_hash = get_password_hash(payload.new_password)
+    user.must_change_password = 0
     audit(db, user.username, "self_password_change")
     db.commit()
     return {"ok": True}
@@ -467,6 +524,7 @@ def change_own_password(
 def create_or_update_user(payload: PasswordChange, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     if user.role not in ["Owner", "Business Manager"]:
         raise HTTPException(403, "Not allowed")
+    _check_admin_rate_limit(user.username)
     u = db.query(User).filter(User.username == payload.username).first()
     if not u:
         u = User(username=payload.username, full_name=payload.full_name or payload.username, role=payload.role or "Sales Agent", password_hash=get_password_hash(payload.new_password))
@@ -486,8 +544,133 @@ def create_or_update_user(payload: PasswordChange, user: User = Depends(get_curr
 def export_json(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     if user.role not in ["Owner", "Business Manager"]:
         raise HTTPException(403, "Not allowed")
-    records = db.query(CRMRecord).all()
+    accessible = [m for m in MODULES if can_access(user, m, write=False)]
+    records = db.query(CRMRecord).filter(CRMRecord.module.in_(accessible)).all()
     return [{"id": r.id, "module": r.module, "code": r.code, "title": r.title, "data": r.data, "created_at": r.created_at.isoformat(), "updated_at": r.updated_at.isoformat()} for r in records]
+
+
+@app.get("/admin/users")
+def list_users(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if user.role not in ["Owner", "Business Manager"]:
+        raise HTTPException(403, "Not allowed")
+    users = db.query(User).order_by(User.username).all()
+    return [{"id": u.id, "username": u.username, "full_name": u.full_name, "role": u.role, "is_active": bool(u.is_active), "created_at": u.created_at.isoformat() if u.created_at else None} for u in users]
+
+
+@app.post("/admin/users/{username}/deactivate")
+def deactivate_user(username: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if user.role not in ["Owner", "Business Manager"]:
+        raise HTTPException(403, "Not allowed")
+    if username == user.username:
+        raise HTTPException(400, "Cannot deactivate your own account")
+    u = db.query(User).filter(User.username == username).first()
+    if not u:
+        raise HTTPException(404, "User not found")
+    u.is_active = 0
+    audit(db, user.username, "deactivate_user", detail=username)
+    db.commit()
+    return {"ok": True}
+
+
+@app.post("/admin/users/{username}/activate")
+def activate_user(username: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if user.role not in ["Owner", "Business Manager"]:
+        raise HTTPException(403, "Not allowed")
+    u = db.query(User).filter(User.username == username).first()
+    if not u:
+        raise HTTPException(404, "User not found")
+    u.is_active = 1
+    audit(db, user.username, "activate_user", detail=username)
+    db.commit()
+    return {"ok": True}
+
+
+@app.get("/admin/audit")
+def get_audit_log(
+    module: Optional[str] = None,
+    username: Optional[str] = None,
+    limit: int = 200,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if user.role not in ["Owner", "Business Manager"]:
+        raise HTTPException(403, "Not allowed")
+    query = db.query(AuditLog)
+    if module:
+        query = query.filter(AuditLog.module == module)
+    if username:
+        query = query.filter(AuditLog.username == username)
+    rows = query.order_by(AuditLog.created_at.desc()).limit(min(limit, 1000)).all()
+    return [{"id": r.id, "username": r.username, "action": r.action, "module": r.module, "record_id": r.record_id, "detail": r.detail, "created_at": r.created_at.isoformat()} for r in rows]
+
+
+@app.get("/records/{module}/count")
+def count_records(module: str, q: str = "", user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if module not in MODULES:
+        raise HTTPException(404, "Unknown module")
+    if not can_access(user, module, write=False):
+        raise HTTPException(403, "Not allowed")
+    query = db.query(func.count(CRMRecord.id)).filter(CRMRecord.module == module, CRMRecord.deleted_at == None)
+    if q:
+        pattern = f"%{q}%"
+        query = query.filter(or_(CRMRecord.code.ilike(pattern), CRMRecord.title.ilike(pattern)))
+    return {"count": query.scalar() or 0}
+
+
+@app.get("/search")
+def global_search(q: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if not q or len(q) < 2:
+        raise HTTPException(400, "Query must be at least 2 characters")
+    accessible = [m for m in MODULES if can_access(user, m, write=False)]
+    pattern = f"%{q}%"
+    records = db.query(CRMRecord).filter(
+        CRMRecord.module.in_(accessible),
+        CRMRecord.deleted_at == None,
+        or_(CRMRecord.code.ilike(pattern), CRMRecord.title.ilike(pattern)),
+    ).order_by(CRMRecord.updated_at.desc()).limit(50).all()
+    q_low = q.lower()
+    results = [r for r in records if q_low in (r.code or "").lower() or q_low in (r.title or "").lower() or q_low in json.dumps(r.data, default=str).lower()]
+    return results
+
+
+@app.get("/reminders")
+def reminders(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    today = datetime.today().date()
+    week_ahead = (today + timedelta(days=7)).isoformat()
+    today_str = today.isoformat()
+    result: Dict[str, List] = {"overdue_leads": [], "upcoming_leads": [], "overdue_ar": []}
+
+    if can_access(user, "leads", write=False):
+        for rec in db.query(CRMRecord).filter(CRMRecord.module == "leads", CRMRecord.deleted_at == None).all():
+            d = rec.data or {}
+            status = d.get("Lead Status", "")
+            if status in ["Closed-Won", "Closed-Lost", "Dormant"]:
+                continue
+            next_action = d.get("Next Action Date")
+            if next_action:
+                try:
+                    nad = str(next_action)[:10]
+                    if nad < today_str:
+                        result["overdue_leads"].append({"id": rec.id, "code": rec.code, "title": rec.title, "next_action_date": nad})
+                    elif nad <= week_ahead:
+                        result["upcoming_leads"].append({"id": rec.id, "code": rec.code, "title": rec.title, "next_action_date": nad})
+                except Exception:
+                    pass
+
+    if can_access(user, "ar", write=False):
+        for rec in db.query(CRMRecord).filter(CRMRecord.module == "ar", CRMRecord.deleted_at == None).all():
+            d = rec.data or {}
+            if d.get("Payment Status") == "Paid":
+                continue
+            try:
+                if float(d.get("Invoice Amount") or 0) - float(d.get("Amount Received") or 0) > 0:
+                    due = str(d.get("Due Date") or "")[:10]
+                    if due and due < today_str:
+                        result["overdue_ar"].append({"id": rec.id, "code": rec.code, "title": rec.title, "due_date": due})
+            except Exception:
+                pass
+
+    return result
 
 
 if __name__ == "__main__":

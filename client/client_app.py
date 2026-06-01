@@ -216,6 +216,7 @@ class API:
         self.token = None
         self.role = None
         self.full_name = None
+        self.must_change_password = False
 
     def headers(self):
         return {"Authorization": f"Bearer {self.token}"} if self.token else {}
@@ -242,6 +243,7 @@ class API:
         self.token = data["access_token"]
         self.role = data.get("role")
         self.full_name = data.get("full_name")
+        self.must_change_password = bool(data.get("must_change_password", False))
         return data
 
     def modules(self):
@@ -254,16 +256,6 @@ class API:
 
     def list_records(self, module, q=""):
         r = requests.get(f"{SERVER_URL}/records/{module}", params={"q": q}, headers=self.headers(), timeout=15)
-        return self._handle(r).json()
-
-    def save_record(self, module, fields, data, record_id=None):
-        code = data.get(fields[0], "") if fields else ""
-        title = data.get("Client Name") or data.get("Company") or data.get("Supplier Name") or code
-        payload = {"module": module, "code": code, "title": title, "data": data}
-        if record_id:
-            r = requests.put(f"{SERVER_URL}/records/{record_id}", json=payload, headers=self.headers(), timeout=10)
-        else:
-            r = requests.post(f"{SERVER_URL}/records", json=payload, headers=self.headers(), timeout=10)
         return self._handle(r).json()
 
     def delete_record(self, record_id):
@@ -279,6 +271,123 @@ class API:
         payload = {"current_password": current_password, "new_password": new_password}
         r = requests.put(f"{SERVER_URL}/users/me/password", json=payload, headers=self.headers(), timeout=10)
         return self._handle(r).json()
+
+    def save_record(self, module, fields, data, record_id=None, version=None):
+        code = data.get(fields[0], "") if fields else ""
+        title = data.get("Client Name") or data.get("Company") or data.get("Supplier Name") or code
+        payload = {"module": module, "code": code, "title": title, "data": data}
+        if version is not None:
+            payload["version"] = version
+        if record_id:
+            r = requests.put(f"{SERVER_URL}/records/{record_id}", json=payload, headers=self.headers(), timeout=10)
+        else:
+            r = requests.post(f"{SERVER_URL}/records", json=payload, headers=self.headers(), timeout=10)
+        return self._handle(r).json()
+
+    def list_users(self):
+        r = requests.get(f"{SERVER_URL}/admin/users", headers=self.headers(), timeout=10)
+        return self._handle(r).json()
+
+    def deactivate_user(self, username):
+        r = requests.post(f"{SERVER_URL}/admin/users/{username}/deactivate", headers=self.headers(), timeout=10)
+        return self._handle(r).json()
+
+    def activate_user(self, username):
+        r = requests.post(f"{SERVER_URL}/admin/users/{username}/activate", headers=self.headers(), timeout=10)
+        return self._handle(r).json()
+
+    def get_audit(self, module=None, username=None):
+        params = {}
+        if module:
+            params["module"] = module
+        if username:
+            params["username"] = username
+        r = requests.get(f"{SERVER_URL}/admin/audit", params=params, headers=self.headers(), timeout=10)
+        return self._handle(r).json()
+
+    def list_trash(self, module):
+        r = requests.get(f"{SERVER_URL}/trash/{module}", headers=self.headers(), timeout=10)
+        return self._handle(r).json()
+
+    def restore_record(self, record_id):
+        r = requests.post(f"{SERVER_URL}/records/{record_id}/restore", headers=self.headers(), timeout=10)
+        return self._handle(r).json()
+
+    def reminders(self):
+        r = requests.get(f"{SERVER_URL}/reminders", headers=self.headers(), timeout=10)
+        return self._handle(r).json()
+
+    def global_search(self, q):
+        r = requests.get(f"{SERVER_URL}/search", params={"q": q}, headers=self.headers(), timeout=15)
+        return self._handle(r).json()
+
+
+# ─── Force Password Change Dialog ────────────────────────────────────────────
+
+class ForcePasswordChangeDialog(Toplevel):
+    """Shown when the server flags must_change_password. User cannot dismiss without changing."""
+    def __init__(self, login_window, api):
+        super().__init__(login_window)
+        self.login_window = login_window
+        self.api = api
+        self.title("Change Password Required")
+        self.geometry("420x320")
+        self.resizable(False, False)
+        self.configure(bg="#f3f6fb")
+        self.protocol("WM_DELETE_WINDOW", lambda: None)  # prevent close
+        set_window_icon(self)
+        self.grab_set()
+
+        Label(self, text="You must set a new password before continuing.", font=("Segoe UI", 10, "bold"),
+              bg="#f3f6fb", fg="#dc2626", wraplength=380, justify=LEFT).pack(pady=(20, 10), padx=20)
+
+        frm = Frame(self, bg="#f3f6fb")
+        frm.pack(padx=20, fill=X)
+
+        Label(frm, text="Current Password", bg="#f3f6fb").pack(anchor=W)
+        self.current = Entry(frm, show="*")
+        self.current.pack(fill=X, pady=(0, 8))
+
+        Label(frm, text="New Password", bg="#f3f6fb").pack(anchor=W)
+        self.new_pw = Entry(frm, show="*")
+        self.new_pw.pack(fill=X, pady=(0, 8))
+
+        Label(frm, text="Confirm New Password", bg="#f3f6fb").pack(anchor=W)
+        self.confirm = Entry(frm, show="*")
+        self.confirm.pack(fill=X, pady=(0, 12))
+
+        self.btn = Button(frm, text="Set Password", bg=PRIMARY_COLOR, fg="white", command=self._submit)
+        self.btn.pack(fill=X, ipady=6)
+
+        self.status = Label(frm, text="", bg="#f3f6fb", fg="#dc2626", font=("Segoe UI", 9))
+        self.status.pack(pady=(6, 0))
+        self.current.focus_set()
+
+    def _submit(self):
+        cur, new, conf = self.current.get(), self.new_pw.get(), self.confirm.get()
+        if not new or not cur:
+            self.status.config(text="All fields are required.")
+            return
+        if new != conf:
+            self.status.config(text="New passwords do not match.")
+            return
+        if len(new) < 8:
+            self.status.config(text="Password must be at least 8 characters.")
+            return
+        self.btn.config(state=DISABLED, text="Saving...")
+        def attempt():
+            try:
+                self.api.change_own_password(cur, new)
+                self.api.must_change_password = False
+                self.after(0, self._done)
+            except Exception as e:
+                self.after(0, lambda: (self.status.config(text=str(e)), self.btn.config(state=NORMAL, text="Set Password")))
+        threading.Thread(target=attempt, daemon=True).start()
+
+    def _done(self):
+        self.destroy()
+        self.login_window.destroy()
+        MainWindow(self.api).mainloop()
 
 
 # ─── Login Window ─────────────────────────────────────────────────────────────
@@ -361,8 +470,11 @@ class LoginWindow(Tk):
         threading.Thread(target=attempt, daemon=True).start()
 
     def _on_login_success(self):
-        self.destroy()
-        MainWindow(self.api).mainloop()
+        if self.api.must_change_password:
+            ForcePasswordChangeDialog(self, self.api)
+        else:
+            self.destroy()
+            MainWindow(self.api).mainloop()
 
     def _on_login_fail(self, msg):
         self.login_btn.config(state=NORMAL, text="Login")
@@ -425,7 +537,8 @@ class RecordDialog(Toplevel):
         def do_save():
             try:
                 record_id = self.record.get("id") if self.record else None
-                self.api.save_record(self.module, self.fields, data, record_id)
+                version = self.record.get("version") if self.record else None
+                self.api.save_record(self.module, self.fields, data, record_id, version=version)
                 self.after(0, lambda: (self.main_window.refresh_current_tab(), self.destroy()))
             except TokenExpiredError:
                 self.after(0, lambda: (self.destroy(), self.main_window._handle_session_expired()))
@@ -589,6 +702,195 @@ class MainWindow(Tk):
     # ── Admin tab ─────────────────────────────────────────────────────────────
 
     def build_admin_tab(self, frame):
+        nb = ttk.Notebook(frame)
+        nb.pack(fill=BOTH, expand=True)
+
+        users_frame = Frame(nb)
+        audit_frame = Frame(nb)
+        trash_frame = Frame(nb)
+        create_frame = Frame(nb)
+        nb.add(users_frame, text="Users")
+        nb.add(audit_frame, text="Audit Log")
+        nb.add(trash_frame, text="Trash")
+        nb.add(create_frame, text="Create / Update User")
+
+        self._build_users_subtab(users_frame)
+        self._build_audit_subtab(audit_frame)
+        self._build_trash_subtab(trash_frame)
+        self._build_create_user_subtab(create_frame)
+
+    def _build_users_subtab(self, frame):
+        toolbar = Frame(frame)
+        toolbar.pack(fill=X, pady=6)
+        Button(toolbar, text="Refresh Users", command=self._load_user_list).pack(side=LEFT, padx=8)
+        Button(toolbar, text="Deactivate Selected", fg="#b91c1c", command=self._deactivate_user).pack(side=LEFT, padx=4)
+        Button(toolbar, text="Activate Selected", fg="#166534", command=self._activate_user).pack(side=LEFT, padx=4)
+
+        cols = ["username", "full_name", "role", "is_active", "created_at"]
+        self.users_tree = ttk.Treeview(frame, columns=cols, show="headings", height=18)
+        for col in cols:
+            self.users_tree.heading(col, text=col.replace("_", " ").title())
+            self.users_tree.column(col, width=160)
+        vsb = ttk.Scrollbar(frame, orient="vertical", command=self.users_tree.yview)
+        self.users_tree.configure(yscrollcommand=vsb.set)
+        self.users_tree.pack(side=LEFT, fill=BOTH, expand=True)
+        vsb.pack(side=RIGHT, fill=Y)
+        self._load_user_list()
+
+    def _load_user_list(self):
+        def fetch():
+            try:
+                users = self.api.list_users()
+                self.after(0, lambda: self._populate_users(users))
+            except TokenExpiredError:
+                self.after(0, self._handle_session_expired)
+            except Exception as e:
+                self.after(0, lambda: messagebox.showerror("Failed", str(e)))
+        threading.Thread(target=fetch, daemon=True).start()
+
+    def _populate_users(self, users):
+        for item in self.users_tree.get_children():
+            self.users_tree.delete(item)
+        for u in users:
+            status = "Active" if u.get("is_active") else "Inactive"
+            self.users_tree.insert("", END, iid=u["username"], values=[u["username"], u.get("full_name", ""), u.get("role", ""), status, u.get("created_at", "")])
+
+    def _deactivate_user(self):
+        sel = self.users_tree.selection()
+        if not sel:
+            messagebox.showwarning("Select user", "Select a user to deactivate.")
+            return
+        username = sel[0]
+        if not messagebox.askyesno("Confirm", f"Deactivate user '{username}'?"):
+            return
+        def do():
+            try:
+                self.api.deactivate_user(username)
+                self.after(0, lambda: (messagebox.showinfo("Done", f"'{username}' deactivated."), self._load_user_list()))
+            except TokenExpiredError:
+                self.after(0, self._handle_session_expired)
+            except Exception as e:
+                self.after(0, lambda: messagebox.showerror("Failed", str(e)))
+        threading.Thread(target=do, daemon=True).start()
+
+    def _activate_user(self):
+        sel = self.users_tree.selection()
+        if not sel:
+            messagebox.showwarning("Select user", "Select a user to activate.")
+            return
+        username = sel[0]
+        def do():
+            try:
+                self.api.activate_user(username)
+                self.after(0, lambda: (messagebox.showinfo("Done", f"'{username}' activated."), self._load_user_list()))
+            except TokenExpiredError:
+                self.after(0, self._handle_session_expired)
+            except Exception as e:
+                self.after(0, lambda: messagebox.showerror("Failed", str(e)))
+        threading.Thread(target=do, daemon=True).start()
+
+    def _build_audit_subtab(self, frame):
+        toolbar = Frame(frame)
+        toolbar.pack(fill=X, pady=6)
+        Label(toolbar, text="Module:").pack(side=LEFT, padx=(8, 2))
+        self.audit_module_var = StringVar()
+        mod_cb = ttk.Combobox(toolbar, textvariable=self.audit_module_var, values=[""] + list(self.modules.keys()), width=16)
+        mod_cb.pack(side=LEFT, padx=4)
+        Label(toolbar, text="User:").pack(side=LEFT, padx=(8, 2))
+        self.audit_user_var = StringVar()
+        Entry(toolbar, textvariable=self.audit_user_var, width=18).pack(side=LEFT, padx=4)
+        Button(toolbar, text="Search", command=self._load_audit).pack(side=LEFT, padx=8)
+
+        cols = ["id", "username", "action", "module", "record_id", "detail", "created_at"]
+        self.audit_tree = ttk.Treeview(frame, columns=cols, show="headings", height=22)
+        widths = {"id": 50, "username": 120, "action": 140, "module": 100, "record_id": 80, "detail": 160, "created_at": 160}
+        for col in cols:
+            self.audit_tree.heading(col, text=col.replace("_", " ").title())
+            self.audit_tree.column(col, width=widths.get(col, 120))
+        vsb = ttk.Scrollbar(frame, orient="vertical", command=self.audit_tree.yview)
+        self.audit_tree.configure(yscrollcommand=vsb.set)
+        self.audit_tree.pack(side=LEFT, fill=BOTH, expand=True)
+        vsb.pack(side=RIGHT, fill=Y)
+
+    def _load_audit(self):
+        mod = self.audit_module_var.get().strip() or None
+        uname = self.audit_user_var.get().strip() or None
+        def fetch():
+            try:
+                rows = self.api.get_audit(module=mod, username=uname)
+                self.after(0, lambda: self._populate_audit(rows))
+            except TokenExpiredError:
+                self.after(0, self._handle_session_expired)
+            except Exception as e:
+                self.after(0, lambda: messagebox.showerror("Failed", str(e)))
+        threading.Thread(target=fetch, daemon=True).start()
+
+    def _populate_audit(self, rows):
+        for item in self.audit_tree.get_children():
+            self.audit_tree.delete(item)
+        for r in rows:
+            self.audit_tree.insert("", END, values=[r.get("id"), r.get("username"), r.get("action"), r.get("module", ""), r.get("record_id", ""), r.get("detail", ""), r.get("created_at", "")])
+
+    def _build_trash_subtab(self, frame):
+        toolbar = Frame(frame)
+        toolbar.pack(fill=X, pady=6)
+        Label(toolbar, text="Module:").pack(side=LEFT, padx=(8, 2))
+        self.trash_module_var = StringVar()
+        mod_cb = ttk.Combobox(toolbar, textvariable=self.trash_module_var, values=list(self.modules.keys()), width=16)
+        mod_cb.pack(side=LEFT, padx=4)
+        if self.modules:
+            mod_cb.set(list(self.modules.keys())[0])
+        Button(toolbar, text="Load Trash", command=self._load_trash).pack(side=LEFT, padx=8)
+        Button(toolbar, text="Restore Selected", fg="#166534", command=self._restore_record).pack(side=LEFT, padx=4)
+
+        cols = ["id", "code", "title", "deleted_at"]
+        self.trash_tree = ttk.Treeview(frame, columns=cols, show="headings", height=22)
+        for col in cols:
+            self.trash_tree.heading(col, text=col.replace("_", " ").title())
+            self.trash_tree.column(col, width=200 if col != "id" else 60)
+        vsb = ttk.Scrollbar(frame, orient="vertical", command=self.trash_tree.yview)
+        self.trash_tree.configure(yscrollcommand=vsb.set)
+        self.trash_tree.pack(side=LEFT, fill=BOTH, expand=True)
+        vsb.pack(side=RIGHT, fill=Y)
+
+    def _load_trash(self):
+        module = self.trash_module_var.get().strip()
+        if not module:
+            messagebox.showwarning("Select module", "Choose a module.")
+            return
+        def fetch():
+            try:
+                recs = self.api.list_trash(module)
+                self.after(0, lambda: self._populate_trash(recs))
+            except TokenExpiredError:
+                self.after(0, self._handle_session_expired)
+            except Exception as e:
+                self.after(0, lambda: messagebox.showerror("Failed", str(e)))
+        threading.Thread(target=fetch, daemon=True).start()
+
+    def _populate_trash(self, recs):
+        for item in self.trash_tree.get_children():
+            self.trash_tree.delete(item)
+        for r in recs:
+            self.trash_tree.insert("", END, iid=str(r["id"]), values=[r["id"], r.get("code", ""), r.get("title", ""), r.get("deleted_at", "")])
+
+    def _restore_record(self):
+        sel = self.trash_tree.selection()
+        if not sel:
+            messagebox.showwarning("Select record", "Select a record to restore.")
+            return
+        record_id = int(sel[0])
+        def do():
+            try:
+                self.api.restore_record(record_id)
+                self.after(0, lambda: (messagebox.showinfo("Restored", "Record restored."), self._load_trash()))
+            except TokenExpiredError:
+                self.after(0, self._handle_session_expired)
+            except Exception as e:
+                self.after(0, lambda: messagebox.showerror("Failed", str(e)))
+        threading.Thread(target=do, daemon=True).start()
+
+    def _build_create_user_subtab(self, frame):
         Label(frame, text="Create or Update User", font=("Segoe UI", 14, "bold")).pack(anchor=W, padx=16, pady=12)
         form = Frame(frame)
         form.pack(anchor=W, padx=16)
@@ -830,7 +1132,11 @@ class MainWindow(Tk):
         def fetch():
             try:
                 data = self.api.dashboard()
-                self.after(0, lambda: self._render_dashboard(data))
+                try:
+                    reminders = self.api.reminders()
+                except Exception:
+                    reminders = {}
+                self.after(0, lambda: self._render_dashboard(data, reminders))
             except TokenExpiredError:
                 self.after(0, self._handle_session_expired)
             except Exception as e:
@@ -843,7 +1149,7 @@ class MainWindow(Tk):
             w.destroy()
         Label(self.dashboard_frame, text=f"Dashboard load failed: {msg}", fg="red").pack(padx=20, pady=20)
 
-    def _render_dashboard(self, data):
+    def _render_dashboard(self, data, reminders=None):
         for w in self.dashboard_frame.winfo_children():
             w.destroy()
         Label(self.dashboard_frame, text=f"{SOFTWARE_NAME} — Management Dashboard",
@@ -879,15 +1185,42 @@ class MainWindow(Tk):
                     widget.configure(cursor="hand2")
                     widget.bind("<Button-1>", lambda e, m=module: self._jump_to_tab(m))
 
-        # ── Record counts table ───────────────────────────────────────────────
-        table = ttk.Treeview(self.dashboard_frame, columns=["Module", "Records"], show="headings", height=12)
+        # ── Record counts + Reminders side-by-side ───────────────────────────
+        lower_frame = Frame(self.dashboard_frame)
+        lower_frame.pack(fill=BOTH, expand=True, padx=18, pady=8)
+
+        table = ttk.Treeview(lower_frame, columns=["Module", "Records"], show="headings", height=10)
         table.heading("Module", text="Module")
         table.heading("Records", text="Records")
-        table.column("Module", width=240)
-        table.column("Records", width=120)
-        table.pack(anchor=W, padx=24, pady=18)
+        table.column("Module", width=200)
+        table.column("Records", width=100)
+        table.pack(side=LEFT, anchor=NW, padx=(0, 24))
         for module, count in data.get("counts", {}).items():
             table.insert("", END, values=[module.title(), count])
+
+        if reminders:
+            rem_frame = Frame(lower_frame)
+            rem_frame.pack(side=LEFT, anchor=NW, fill=BOTH, expand=True)
+            Label(rem_frame, text="Reminders & Alerts", font=("Segoe UI", 12, "bold"), fg="#b91c1c").pack(anchor=W)
+
+            overdue_leads = reminders.get("overdue_leads", [])
+            upcoming_leads = reminders.get("upcoming_leads", [])
+            overdue_ar = reminders.get("overdue_ar", [])
+
+            def _rem_section(parent, title, items, fg):
+                if not items:
+                    return
+                Label(parent, text=title, font=("Segoe UI", 10, "bold"), fg=fg).pack(anchor=W, pady=(8, 2))
+                for item in items[:10]:
+                    text = f"  [{item.get('code','')}] {item.get('title','')} — {item.get('next_action_date') or item.get('due_date','')}"
+                    Label(parent, text=text, font=("Segoe UI", 9), fg="#374151", wraplength=380, justify=LEFT).pack(anchor=W)
+
+            _rem_section(rem_frame, f"Overdue Follow-Ups ({len(overdue_leads)})", overdue_leads, "#b91c1c")
+            _rem_section(rem_frame, f"Upcoming Follow-Ups this week ({len(upcoming_leads)})", upcoming_leads, "#92400E")
+            _rem_section(rem_frame, f"Overdue AR ({len(overdue_ar)})", overdue_ar, "#7C3AED")
+
+            if not overdue_leads and not upcoming_leads and not overdue_ar:
+                Label(rem_frame, text="No pending reminders.", fg="#16a34a", font=("Segoe UI", 10)).pack(anchor=W, pady=8)
 
     # ── Help tab ──────────────────────────────────────────────────────────────
 

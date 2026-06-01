@@ -1,4 +1,4 @@
-name: Build Windows EXE
+name: Build Installers
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-windows:
     runs-on: windows-latest
 
     steps:
@@ -48,12 +48,9 @@ jobs:
             --windows-icon-from-ico="..\build_icon.ico" `
             --company-name="SA Ultimate Solutions" `
             --product-name="SA-US ERP Server" `
-            --file-version="2.1.0.0" `
-            --product-version="2.1.0.0" `
+            --file-version="2.3.0.0" `
+            --product-version="2.3.0.0" `
             app.py
-
-      - name: Copy server assets
-        run: copy server\server_config.ini dist\server\
 
       - name: Build Client EXE
         run: |
@@ -68,27 +65,91 @@ jobs:
             --enable-plugin=tk-inter `
             --company-name="SA Ultimate Solutions" `
             --product-name="SA-US ERP Client" `
-            --file-version="2.1.0.0" `
-            --product-version="2.1.0.0" `
+            --file-version="2.3.0.0" `
+            --product-version="2.3.0.0" `
             --include-data-dir=branding=branding `
             client_app.py
 
       - name: Copy client assets
         run: |
-          copy client\client_config.ini dist\client\
-          copy client\tenant_branding.json dist\client\
           xcopy /E /I client\branding dist\client\branding
 
       - name: Upload Server EXE
         uses: actions/upload-artifact@v4
         with:
-          name: SA_US_ERP_Server
+          name: SA_US_ERP_Server_Windows
           path: dist/server/
           retention-days: 30
 
       - name: Upload Client EXE
         uses: actions/upload-artifact@v4
         with:
-          name: SA_US_ERP_Client
+          name: SA_US_ERP_Client_Windows
+          path: dist/client/
+          retention-days: 30
+
+  build-macos:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install PyInstaller and dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller pillow
+          pip install -r server/requirements.txt
+          pip install -r client/requirements.txt
+
+      - name: Convert PNG icon to ICNS
+        run: |
+          python - <<'EOF'
+          import subprocess, os
+          from PIL import Image
+          img = Image.open("client/branding/app_logo.png").convert("RGBA")
+          iconset = "build_icon.iconset"
+          os.makedirs(iconset, exist_ok=True)
+          for size in [16, 32, 64, 128, 256, 512]:
+              img.resize((size, size), Image.LANCZOS).save(f"{iconset}/icon_{size}x{size}.png")
+              img.resize((size*2, size*2), Image.LANCZOS).save(f"{iconset}/icon_{size}x{size}@2x.png")
+          subprocess.run(["iconutil", "-c", "icns", iconset, "-o", "build_icon.icns"], check=True)
+          print("ICNS created.")
+          EOF
+
+      - name: Build Server app
+        run: |
+          pyinstaller \
+            --onefile \
+            --name SA_US_ERP_Server \
+            --distpath dist/server \
+            server/app.py
+
+      - name: Build Client app
+        run: |
+          pyinstaller \
+            --onefile \
+            --windowed \
+            --name SA_US_ERP_Client \
+            --icon build_icon.icns \
+            --distpath dist/client \
+            --add-data "client/branding:branding" \
+            client/client_app.py
+
+      - name: Upload Server (macOS)
+        uses: actions/upload-artifact@v4
+        with:
+          name: SA_US_ERP_Server_macOS
+          path: dist/server/
+          retention-days: 30
+
+      - name: Upload Client (macOS)
+        uses: actions/upload-artifact@v4
+        with:
+          name: SA_US_ERP_Client_macOS
           path: dist/client/
           retention-days: 30

@@ -18,7 +18,7 @@
 
 set -e
 
-PROJECT="/storage/emulated/0/SA-uS-cRM"
+PROJECT="/storage/emulated/0/SA-US-CRM"
 DIST="$PROJECT/dist"
 BUILD_DATE=$(date +%Y%m%d)
 SERVER_ZIP="$DIST/SA_US_ERP_Server_${BUILD_DATE}.zip"
