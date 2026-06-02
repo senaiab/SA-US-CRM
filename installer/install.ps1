@@ -293,26 +293,8 @@ function Initialize-Database {
             $proc.WaitForExit()
 
             if ($proc.ExitCode -eq 0) {
-                # Verify app user can connect
-                $escapedMysqlV = $mysql.Replace('"', '""')
-                $verifyArgs    = "-u sa_us_user -pSAUSERP2026! sa_us_erp -e `"SELECT 1`""
-                $vPsi = New-Object System.Diagnostics.ProcessStartInfo
-                $vPsi.FileName               = "cmd.exe"
-                $vPsi.Arguments              = "/c `"`"$escapedMysqlV`" $verifyArgs`""
-                $vPsi.UseShellExecute        = $false
-                $vPsi.RedirectStandardError  = $true
-                $vPsi.RedirectStandardOutput = $true
-                $vPsi.CreateNoWindow         = $true
-                $vProc = [System.Diagnostics.Process]::Start($vPsi)
-                $vProc.WaitForExit()
-
-                if ($vProc.ExitCode -eq 0) {
-                    $statusLbl.ForeColor = [System.Drawing.Color]::DarkGreen
-                    $statusLbl.Text = "Database created and verified successfully!"
-                } else {
-                    $statusLbl.ForeColor = [System.Drawing.Color]::DarkOrange
-                    $statusLbl.Text = "Database created but app-user verification failed. Check server_config.ini."
-                }
+                $statusLbl.ForeColor = [System.Drawing.Color]::DarkGreen
+                $statusLbl.Text = "Database created successfully! Open SA-US ERP Configuration to set the password."
                 $form.Refresh()
                 Start-Sleep -Milliseconds 1400
                 $form.DialogResult = [System.Windows.Forms.DialogResult]::OK
@@ -560,7 +542,7 @@ start "" "%InstallDir%"
     $uninstallKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\SA-US ERP"
     New-Item -Path $uninstallKey -Force | Out-Null
     New-ItemProperty -Path $uninstallKey -Name "DisplayName" -Value "SA-US ERP" -PropertyType String -Force | Out-Null
-    New-ItemProperty -Path $uninstallKey -Name "DisplayVersion" -Value "2.2.0" -PropertyType String -Force | Out-Null
+    New-ItemProperty -Path $uninstallKey -Name "DisplayVersion" -Value "2.3.0" -PropertyType String -Force | Out-Null
     New-ItemProperty -Path $uninstallKey -Name "Publisher" -Value "SA Ultimate Solutions" -PropertyType String -Force | Out-Null
     New-ItemProperty -Path $uninstallKey -Name "InstallLocation" -Value $InstallDir -PropertyType String -Force | Out-Null
     New-ItemProperty -Path $uninstallKey -Name "UninstallString" -Value "`"$InstallDir\uninstall.cmd`"" -PropertyType String -Force | Out-Null

@@ -21,7 +21,7 @@ jobs:
       - name: Install Nuitka and dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install nuitka ordered-set zstandard
+          pip install nuitka ordered-set zstandard pillow
           pip install -r server/requirements.txt
           pip install -r client/requirements.txt
 
@@ -70,23 +70,37 @@ jobs:
             --include-data-dir=branding=branding `
             client_app.py
 
-      - name: Copy client assets
+      - name: Copy client branding assets
+        run: xcopy /E /I client\branding dist\client\branding
+
+      - name: Assemble and build SA-US-ERP-Setup.exe
+        shell: powershell
         run: |
-          xcopy /E /I client\branding dist\client\branding
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File "installer\build_payload.ps1" `
+            -RootDir "$env:GITHUB_WORKSPACE" `
+            -ReleaseDir "$env:GITHUB_WORKSPACE\release" `
+            -OutputExe "$env:GITHUB_WORKSPACE\release\SA-US-ERP-Setup.exe"
 
-      - name: Upload Server EXE
+      - name: Upload Windows Installer
         uses: actions/upload-artifact@v4
         with:
-          name: SA_US_ERP_Server_Windows
-          path: dist/server/
+          name: SA-US-ERP-Setup-Windows
+          path: release/SA-US-ERP-Setup.exe
           retention-days: 30
 
-      - name: Upload Client EXE
+      - name: Upload raw Server EXE (for advanced use)
         uses: actions/upload-artifact@v4
         with:
-          name: SA_US_ERP_Client_Windows
-          path: dist/client/
-          retention-days: 30
+          name: SA_US_ERP_Server_Windows_raw
+          path: dist/server/SA_US_ERP_Server.exe
+          retention-days: 14
+
+      - name: Upload raw Client EXE (for advanced use)
+        uses: actions/upload-artifact@v4
+        with:
+          name: SA_US_ERP_Client_Windows_raw
+          path: dist/client/SA_US_ERP_Client.exe
+          retention-days: 14
 
   build-macos:
     runs-on: macos-latest
@@ -121,7 +135,7 @@ jobs:
           print("ICNS created.")
           EOF
 
-      - name: Build Server app
+      - name: Build Server binary
         run: |
           pyinstaller \
             --onefile \
@@ -129,7 +143,7 @@ jobs:
             --distpath dist/server \
             server/app.py
 
-      - name: Build Client app
+      - name: Build Client binary
         run: |
           pyinstaller \
             --onefile \
@@ -140,16 +154,26 @@ jobs:
             --add-data "client/branding:branding" \
             client/client_app.py
 
-      - name: Upload Server (macOS)
-        uses: actions/upload-artifact@v4
-        with:
-          name: SA_US_ERP_Server_macOS
-          path: dist/server/
-          retention-days: 30
+      - name: Assemble macOS installer package
+        run: |
+          PKG="release/SA-US-ERP-macOS"
+          mkdir -p "$PKG/server" "$PKG/client" "$PKG/sql"
+          cp dist/server/SA_US_ERP_Server "$PKG/server/"
+          cp dist/client/SA_US_ERP_Client "$PKG/client/"
+          cp -r client/branding "$PKG/client/branding"
+          cp sql/create_database.sql "$PKG/sql/"
+          cp server/server_config.example.ini "$PKG/server/"
+          cp installer/macos/install.sh "$PKG/install.sh"
+          chmod +x "$PKG/install.sh" "$PKG/server/SA_US_ERP_Server" "$PKG/client/SA_US_ERP_Client"
+          # Create DMG
+          hdiutil create -volname "SA-US ERP" \
+            -srcfolder "$PKG" \
+            -ov -format UDZO \
+            "release/SA-US-ERP-macOS.dmg"
 
-      - name: Upload Client (macOS)
+      - name: Upload macOS Installer DMG
         uses: actions/upload-artifact@v4
         with:
-          name: SA_US_ERP_Client_macOS
-          path: dist/client/
+          name: SA-US-ERP-macOS-DMG
+          path: release/SA-US-ERP-macOS.dmg
           retention-days: 30
