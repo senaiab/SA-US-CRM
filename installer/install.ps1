@@ -170,6 +170,163 @@ function Offer-DatabasePrerequisite {
     }
 }
 
+function New-RandomPassword {
+    $chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%'
+    $rng   = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+    $bytes = [byte[]]::new(24)
+    $rng.GetBytes($bytes)
+    return -join ($bytes | ForEach-Object { $chars[$_ % $chars.Length] })
+}
+
+
+function Set-MariaDbRootPassword {
+    <#
+    .SYNOPSIS
+        Generates (or accepts) a root password for a freshly installed MariaDB,
+        applies it with mysqladmin, and saves DATABASE_CREDENTIALS.txt to $InstallDir.
+        Returns the password that was set, or "" if skipped/failed.
+    #>
+    param([Parameter(Mandatory = $true)][string]$InstallDir)
+
+    $mysql = Find-MySql
+    if (!$mysql) { return "" }
+
+    $mysqlDir    = Split-Path -Parent $mysql
+    $mysqladmin  = Join-Path $mysqlDir "mysqladmin.exe"
+    if (!(Test-Path -LiteralPath $mysqladmin)) { $mysqladmin = "mysqladmin.exe" }
+
+    $generated = New-RandomPassword
+
+    Add-Type -AssemblyName System.Windows.Forms
+    Add-Type -AssemblyName System.Drawing
+
+    $form = New-Object System.Windows.Forms.Form
+    $form.Text            = "SA-US ERP — Set MariaDB Root Password"
+    $form.Size            = New-Object System.Drawing.Size(500, 290)
+    $form.StartPosition   = "CenterScreen"
+    $form.FormBorderStyle = "FixedDialog"
+    $form.MaximizeBox     = $false
+    $form.MinimizeBox     = $false
+
+    $info = New-Object System.Windows.Forms.Label
+    $info.Text = "MariaDB was just installed with no root password.`n`nA strong password has been generated below. You may change it.`nThe password will be saved to DATABASE_CREDENTIALS.txt in the`ninstall folder. Keep that file in a safe place."
+    $info.AutoSize = $false
+    $info.Size     = New-Object System.Drawing.Size(456, 90)
+    $info.Location = New-Object System.Drawing.Point(18, 14)
+    $form.Controls.Add($info)
+
+    $pwLabel = New-Object System.Windows.Forms.Label
+    $pwLabel.Text     = "Root password:"
+    $pwLabel.AutoSize = $true
+    $pwLabel.Location = New-Object System.Drawing.Point(18, 114)
+    $form.Controls.Add($pwLabel)
+
+    $pwBox = New-Object System.Windows.Forms.TextBox
+    $pwBox.Text     = $generated
+    $pwBox.Size     = New-Object System.Drawing.Size(330, 24)
+    $pwBox.Location = New-Object System.Drawing.Point(18, 136)
+    $pwBox.UseSystemPasswordChar = $false
+    $form.Controls.Add($pwBox)
+
+    $showChk = New-Object System.Windows.Forms.CheckBox
+    $showChk.Text     = "Hide"
+    $showChk.Checked  = $false
+    $showChk.AutoSize = $true
+    $showChk.Location = New-Object System.Drawing.Point(358, 137)
+    $showChk.Add_CheckedChanged({ $pwBox.UseSystemPasswordChar = $showChk.Checked })
+    $form.Controls.Add($showChk)
+
+    $statusLbl = New-Object System.Windows.Forms.Label
+    $statusLbl.Text      = ""
+    $statusLbl.AutoSize  = $false
+    $statusLbl.Size      = New-Object System.Drawing.Size(456, 22)
+    $statusLbl.Location  = New-Object System.Drawing.Point(18, 172)
+    $statusLbl.ForeColor = [System.Drawing.Color]::DarkRed
+    $form.Controls.Add($statusLbl)
+
+    $setBtn = New-Object System.Windows.Forms.Button
+    $setBtn.Text      = "Set Password"
+    $setBtn.Size      = New-Object System.Drawing.Size(130, 36)
+    $setBtn.Location  = New-Object System.Drawing.Point(18, 210)
+    $setBtn.BackColor = [System.Drawing.Color]::FromArgb(21, 101, 192)
+    $setBtn.ForeColor = [System.Drawing.Color]::White
+    $setBtn.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+    $form.AcceptButton = $setBtn
+    $form.Controls.Add($setBtn)
+
+    $skipBtn = New-Object System.Windows.Forms.Button
+    $skipBtn.Text         = "Skip (set later)"
+    $skipBtn.Size         = New-Object System.Drawing.Size(130, 36)
+    $skipBtn.Location     = New-Object System.Drawing.Point(160, 210)
+    $skipBtn.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
+    $form.CancelButton    = $skipBtn
+    $form.Controls.Add($skipBtn)
+
+    $setResult = ""
+
+    $setBtn.Add_Click({
+        $pw = $pwBox.Text.Trim()
+        if ($pw.Length -lt 8) {
+            $statusLbl.ForeColor = [System.Drawing.Color]::DarkRed
+            $statusLbl.Text = "Password must be at least 8 characters."
+            return
+        }
+        $setBtn.Enabled = $false
+        $statusLbl.ForeColor = [System.Drawing.Color]::DarkBlue
+        $statusLbl.Text = "Setting password…"
+        $form.Refresh()
+
+        $proc = Start-Process -FilePath $mysqladmin `
+            -ArgumentList @("-u", "root", "password", $pw) `
+            -Wait -PassThru -NoNewWindow `
+            -RedirectStandardError "$env:TEMP\sa_mysqladmin_err.txt"
+
+        if ($proc.ExitCode -eq 0) {
+            $script:setResult = $pw
+
+            # Save credentials file
+            $credFile = Join-Path $InstallDir "DATABASE_CREDENTIALS.txt"
+            @"
+SA-US ERP — Database Administrator Credentials
+Created: $(Get-Date -Format "yyyy-MM-dd HH:mm")
+============================================================
+
+MariaDB Root User : root
+MariaDB Root Pass : $pw
+
+IMPORTANT: Keep this file secure or delete it after noting the password.
+
+To change the root password (run in Command Prompt):
+  mysqladmin -u root -p"$pw" password "YOUR_NEW_PASSWORD"
+
+To set the SA-US ERP app database password:
+  Open the "SA-US ERP Configuration" shortcut on the Desktop,
+  go to the Server tab, set the Database password field, then
+  click "Initialize SA-US ERP Database".
+"@ | Set-Content -Path $credFile -Encoding UTF8
+
+            $statusLbl.ForeColor = [System.Drawing.Color]::DarkGreen
+            $statusLbl.Text = "Password set. Saved to DATABASE_CREDENTIALS.txt."
+            $form.Refresh()
+            Start-Sleep -Milliseconds 1200
+            $form.DialogResult = [System.Windows.Forms.DialogResult]::OK
+            $form.Close()
+        } else {
+            $errText = ""
+            if (Test-Path "$env:TEMP\sa_mysqladmin_err.txt") {
+                $errText = (Get-Content "$env:TEMP\sa_mysqladmin_err.txt" -Raw).Trim()
+            }
+            $statusLbl.ForeColor = [System.Drawing.Color]::DarkRed
+            $statusLbl.Text = if ($errText) { $errText.Substring(0, [Math]::Min($errText.Length, 80)) } else { "Failed. Check MariaDB is running." }
+            $setBtn.Enabled = $true
+        }
+    })
+
+    $form.ShowDialog() | Out-Null
+    return $script:setResult
+}
+
+
 function Initialize-Database {
     <#
     .SYNOPSIS
@@ -177,7 +334,10 @@ function Initialize-Database {
         Shows a GUI dialog asking for the MySQL/MariaDB root password, then runs
         sql\create_database.sql. Safe to run on an existing install (uses IF NOT EXISTS).
     #>
-    param([Parameter(Mandatory = $true)][string]$InstallDir)
+    param(
+        [Parameter(Mandatory = $true)][string]$InstallDir,
+        [string]$PresetRootPassword = ""
+    )
 
     $sqlFile = Join-Path $InstallDir "sql\create_database.sql"
     if (!(Test-Path -LiteralPath $sqlFile)) {
@@ -214,7 +374,7 @@ function Initialize-Database {
 
     # Password label + field (only shown when mysql is available)
     $pwLabel = New-Object System.Windows.Forms.Label
-    $pwLabel.Text     = "MySQL root password:"
+    $pwLabel.Text     = if ($PresetRootPassword) { "MySQL root password (set during install):" } else { "MySQL root password:" }
     $pwLabel.AutoSize = $true
     $pwLabel.Location = New-Object System.Drawing.Point(20, 126)
     $pwLabel.Enabled  = ($null -ne $mysql)
@@ -225,6 +385,7 @@ function Initialize-Database {
     $pwBox.Size     = New-Object System.Drawing.Size(300, 22)
     $pwBox.Location = New-Object System.Drawing.Point(20, 148)
     $pwBox.Enabled  = ($null -ne $mysql)
+    if ($PresetRootPassword) { $pwBox.Text = $PresetRootPassword }
     $form.Controls.Add($pwBox)
 
     # Status label
@@ -551,12 +712,22 @@ start "" "%InstallDir%"
     New-ItemProperty -Path $uninstallKey -Name "NoRepair" -Value 1 -PropertyType DWord -Force | Out-Null
 
     if ($InstallMode -eq "server" -or $InstallMode -eq "both") {
-        # 1. Install MariaDB if not already present
+        # 1. Track whether MariaDB already existed before install
+        $dbWasAbsent = !(Test-DatabaseServiceInstalled)
+
+        # 2. Install MariaDB if not already present
         if (!$SkipShortcuts) {
             Offer-DatabasePrerequisite -InstallDir $InstallDir
         }
-        # 2. Create the database and app user automatically
-        Initialize-Database -InstallDir $InstallDir
+
+        # 3. Set root password if this was a fresh MariaDB install
+        $presetRootPw = ""
+        if ($dbWasAbsent -and (Test-DatabaseServiceInstalled)) {
+            $presetRootPw = Set-MariaDbRootPassword -InstallDir $InstallDir
+        }
+
+        # 4. Create the database and app user
+        Initialize-Database -InstallDir $InstallDir -PresetRootPassword $presetRootPw
     }
 
     "Installed successfully: $(Get-Date -Format s)" | Out-File -FilePath $logPath -Append -Encoding utf8

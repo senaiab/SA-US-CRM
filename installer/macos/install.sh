@@ -64,11 +64,49 @@ if [[ "$INSTALL_MODE" == "server" || "$INSTALL_MODE" == "both" ]]; then
   # ── Start MariaDB service ────────────────────────────────────────────────
   step "Starting MariaDB service"
   brew services start mariadb | tee -a "$LOG" || warn "Could not start MariaDB service automatically."
-  sleep 3
+  sleep 4
   if mysql -u root -e "SELECT 1" &>/dev/null 2>&1; then
     ok "MariaDB is running"
   else
     warn "MariaDB may not be running yet. Try: brew services start mariadb"
+  fi
+
+  # ── Set MariaDB root password ────────────────────────────────────────────
+  step "Setting MariaDB root password"
+  # Generate a strong random password using openssl
+  GENERATED_PW="$(openssl rand -base64 18 | tr -d '/+=' | head -c 20)"
+  echo ""
+  echo "  A strong root password has been generated: $GENERATED_PW"
+  echo ""
+  read -rp "  Press Enter to use it, or type a custom password: " CUSTOM_PW
+  ROOT_PW="${CUSTOM_PW:-$GENERATED_PW}"
+
+  if mysqladmin -u root password "$ROOT_PW" 2>>"$LOG"; then
+    ok "MariaDB root password set"
+    CRED_FILE="$APP_DIR/DATABASE_CREDENTIALS.txt"
+    mkdir -p "$APP_DIR"
+    cat > "$CRED_FILE" <<CREDS
+SA-US ERP — Database Administrator Credentials
+Created: $(date)
+============================================================
+
+MariaDB Root User : root
+MariaDB Root Pass : $ROOT_PW
+
+IMPORTANT: Keep this file secure or delete it after noting the password.
+
+To change the root password:
+  mysqladmin -u root -p"$ROOT_PW" password "YOUR_NEW_PASSWORD"
+
+To set the SA-US ERP app database password:
+  Edit: $APP_DIR/server/server_config.ini
+  (update the password in the database URL, then restart the server)
+CREDS
+    chmod 600 "$CRED_FILE"
+    ok "Credentials saved to: $CRED_FILE"
+  else
+    warn "Could not set root password automatically."
+    ROOT_PW=""
   fi
 fi
 
@@ -137,10 +175,11 @@ if [[ "$INSTALL_MODE" == "server" || "$INSTALL_MODE" == "both" ]]; then
   step "Creating SA-US ERP database"
   SQL_FILE="$APP_DIR/sql/create_database.sql"
   if [[ -f "$SQL_FILE" ]]; then
-    echo ""
-    echo "This will create the sa_us_erp database and user."
-    read -rp "Enter MariaDB root password (leave blank if none): " -s ROOT_PW
-    echo ""
+    # Use the root password we just set; ask if it wasn't set (existing install)
+    if [[ -z "${ROOT_PW:-}" ]]; then
+      read -rsp "  Enter MariaDB root password: " ROOT_PW
+      echo ""
+    fi
     if [[ -n "$ROOT_PW" ]]; then
       MYSQL_CMD="mysql -u root -p${ROOT_PW}"
     else
