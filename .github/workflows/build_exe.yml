@@ -74,12 +74,60 @@ jobs:
         run: xcopy /E /I client\branding dist\client\branding
 
       - name: Assemble and build SA-US-ERP-Setup.exe
-        shell: powershell
+        shell: pwsh
         run: |
-          powershell.exe -NoProfile -ExecutionPolicy Bypass -File "installer\build_payload.ps1" `
-            -RootDir "$env:GITHUB_WORKSPACE" `
-            -ReleaseDir "$env:GITHUB_WORKSPACE\release" `
-            -OutputExe "$env:GITHUB_WORKSPACE\release\SA-US-ERP-Setup.exe"
+          $root    = $env:GITHUB_WORKSPACE
+          $payload = "$root\release\payload"
+          $srcDir  = "$root\release\installer_source"
+          $outExe  = "$root\release\SA-US-ERP-Setup.exe"
+
+          # Create folder structure
+          foreach ($d in @("$payload\server","$payload\client","$payload\sql","$payload\uninstall","$srcDir")) {
+            New-Item -ItemType Directory -Force -Path $d | Out-Null
+          }
+
+          # Copy EXEs and assets
+          Copy-Item "$root\dist\server\SA_US_ERP_Server.exe"   "$payload\server\"
+          Copy-Item "$root\dist\client\SA_US_ERP_Client.exe"   "$payload\client\"
+          Copy-Item -Recurse "$root\client\branding"           "$payload\client\branding"
+          Copy-Item -Recurse "$root\sql\."                     "$payload\sql\"
+          if (Test-Path "$root\server\server_config.example.ini") {
+            Copy-Item "$root\server\server_config.example.ini" "$payload\server\"
+          }
+
+          # Copy installer scripts
+          foreach ($f in @("install.cmd","install.ps1","prerequisites.cmd","prerequisites.ps1")) {
+            Copy-Item "$root\installer\$f" "$payload\$f"
+            Copy-Item "$root\installer\$f" "$srcDir\$f"
+          }
+          foreach ($f in @("uninstall.cmd","uninstall.ps1")) {
+            if (Test-Path "$root\installer\$f") {
+              Copy-Item "$root\installer\$f" "$payload\uninstall\$f"
+            }
+          }
+
+          # Zip payload
+          $zipPath = "$srcDir\payload.zip"
+          Compress-Archive -Path $payload -DestinationPath $zipPath -CompressionLevel Optimal
+
+          # Find csc.exe (.NET Framework compiler, always present on Windows)
+          $csc = Get-ChildItem "$env:SystemRoot\Microsoft.NET\Framework64" -Filter csc.exe -Recurse -ErrorAction SilentlyContinue |
+                 Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
+          if (-not $csc) { throw "csc.exe not found" }
+          Write-Host "Using CSC: $csc"
+
+          New-Item -ItemType Directory -Force (Split-Path $outExe) | Out-Null
+
+          # Compile single-file setup EXE with payload embedded as resources
+          & $csc /target:winexe /optimize+ /nologo `
+            "/out:$outExe" `
+            "/resource:$zipPath,payload.zip" `
+            "/resource:$srcDir\install.cmd,install.cmd" `
+            "/resource:$srcDir\install.ps1,install.ps1" `
+            "$root\installer\SetupBootstrapper.cs"
+
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Write-Host "Setup EXE: $((Get-Item $outExe).Length / 1MB -as [int]) MB"
 
       - name: Upload Windows Installer
         uses: actions/upload-artifact@v4
