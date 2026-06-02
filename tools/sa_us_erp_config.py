@@ -242,7 +242,7 @@ class ConfigApp(Tk):
     def __init__(self):
         super().__init__()
         self.title("SA-US ERP Configuration")
-        self.geometry("680x720")
+        self.geometry("680x980")
         self.resizable(False, False)
 
         notebook = ttk.Notebook(self)
@@ -314,6 +314,32 @@ class ConfigApp(Tk):
             self.root_vars[key] = var
             self.add_entry(parent, label, var, 13 + offset, show="*" if key == "root_password" else None)
         Button(parent, text="Initialize SA-US ERP Database", command=self.initialize_database).grid(row=17, column=1, sticky=W, padx=10, pady=8)
+
+        ttk.Separator(parent, orient=HORIZONTAL).grid(row=18, column=0, columnspan=2, sticky=EW, padx=10, pady=14)
+        Label(parent, text="Change MariaDB/MySQL root password", font=("Segoe UI", 9, "bold")).grid(row=19, column=0, columnspan=2, sticky=W, padx=10, pady=(0, 6))
+        chpw_labels = [
+            ("chpw_host", "Host"),
+            ("chpw_port", "Port"),
+            ("chpw_user", "Root user"),
+            ("chpw_current", "Current password"),
+            ("chpw_new", "New password"),
+            ("chpw_confirm", "Confirm new password"),
+        ]
+        chpw_defaults = {
+            "chpw_host": cfg["host"],
+            "chpw_port": cfg["port"],
+            "chpw_user": "root",
+            "chpw_current": "",
+            "chpw_new": "",
+            "chpw_confirm": "",
+        }
+        self.chpw_vars = {}
+        for offset, (key, label) in enumerate(chpw_labels):
+            var = StringVar(value=chpw_defaults[key])
+            self.chpw_vars[key] = var
+            show = "*" if key in ("chpw_current", "chpw_new", "chpw_confirm") else None
+            self.add_entry(parent, label, var, 20 + offset, show=show)
+        Button(parent, text="Change Root Password", command=self.change_root_password).grid(row=26, column=1, sticky=W, padx=10, pady=8)
 
     def build_client_tab(self, parent):
         Label(parent, text=f"This machine IP: {local_ip()}").pack(anchor=W, padx=14, pady=(16, 8))
@@ -416,6 +442,59 @@ Open the Start Menu shortcut named "SA-US ERP Server Console"; it keeps the wind
             messagebox.showinfo("Saved", "Client network configuration saved. Restart the client.")
         except Exception as exc:
             messagebox.showerror("Save failed", str(exc))
+
+    def change_root_password(self):
+        host = self.chpw_vars["chpw_host"].get().strip()
+        port = self.chpw_vars["chpw_port"].get().strip()
+        user = self.chpw_vars["chpw_user"].get().strip()
+        current = self.chpw_vars["chpw_current"].get()
+        new_pw = self.chpw_vars["chpw_new"].get()
+        confirm = self.chpw_vars["chpw_confirm"].get()
+        if not host or not port or not user:
+            messagebox.showerror("Validation", "Host, port, and root user are required.")
+            return
+        if len(new_pw) < 8:
+            messagebox.showerror("Validation", "New password must be at least 8 characters.")
+            return
+        if new_pw != confirm:
+            messagebox.showerror("Validation", "New password and confirmation do not match.")
+            return
+        try:
+            conn = connect_root(host, port, user, current)
+            with conn.cursor() as cur:
+                cur.execute("ALTER USER %s@'localhost' IDENTIFIED BY %s", (user, new_pw))
+                cur.execute("ALTER USER %s@'127.0.0.1' IDENTIFIED BY %s", (user, new_pw))
+                cur.execute("ALTER USER %s@'%%' IDENTIFIED BY %s", (user, new_pw))
+                cur.execute("FLUSH PRIVILEGES")
+            conn.commit()
+            conn.close()
+            # Update DATABASE_CREDENTIALS.txt if it exists next to this tool
+            cred_paths = [
+                BASE_DIR / "DATABASE_CREDENTIALS.txt",
+                BASE_DIR.parent / "DATABASE_CREDENTIALS.txt",
+            ]
+            for cred_path in cred_paths:
+                if cred_path.exists():
+                    import datetime
+                    lines = cred_path.read_text(encoding="utf-8").splitlines()
+                    updated = []
+                    for line in lines:
+                        if line.startswith("MariaDB Root Pass"):
+                            updated.append(f"MariaDB Root Pass : {new_pw}")
+                        elif line.startswith("Created:"):
+                            updated.append(line)
+                            updated.append(f"Last changed     : {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}")
+                        else:
+                            updated.append(line)
+                    cred_path.write_text("\n".join(updated) + "\n", encoding="utf-8")
+                    break
+            # Clear the password fields
+            self.chpw_vars["chpw_current"].set("")
+            self.chpw_vars["chpw_new"].set("")
+            self.chpw_vars["chpw_confirm"].set("")
+            messagebox.showinfo("Success", "Root password changed successfully.")
+        except Exception as exc:
+            messagebox.showerror("Failed", str(exc))
 
     def save_user(self):
         try:
