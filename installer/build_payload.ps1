@@ -246,8 +246,10 @@ if (!$csc) {
         throw "Neither csc.exe nor iexpress.exe could be found. Cannot build setup EXE."
     }
 
-    # Generate the .sed config dynamically so paths are always correct
-    $sedContent = @"
+    # Generate the .sed config dynamically so paths are always correct.
+    # Single-quoted here-string avoids variable-expansion / terminator issues;
+    # placeholders are swapped out with .Replace() afterwards.
+    $sedContent = @'
 [Version]
 Class=IEXPRESS
 SEDVersion=3
@@ -264,7 +266,7 @@ RebootMode=N
 InstallPrompt=
 DisplayLicense=
 FinishMessage=SA-US ERP Setup is complete.
-TargetName=$OutputExe
+TargetName=__OUTPUT_EXE__
 FriendlyName=SA-US ERP Setup
 AppLaunched=install.cmd
 PostInstallCmd=<None>
@@ -280,7 +282,7 @@ FILE3="prerequisites.ps1"
 FILE4="payload.zip"
 
 [SourceFiles]
-SourceFiles0=$srcDir\
+SourceFiles0=__SRC_DIR__\
 
 [SourceFiles0]
 %FILE0%=
@@ -288,7 +290,8 @@ SourceFiles0=$srcDir\
 %FILE2%=
 %FILE3%=
 %FILE4%=
-"@
+'@
+    $sedContent = $sedContent.Replace('__OUTPUT_EXE__', $OutputExe).Replace('__SRC_DIR__', $srcDir)
 
     $sedPath = Join-Path $env:TEMP "sa_us_erp_setup.sed"
     $sedContent | Out-File -FilePath $sedPath -Encoding ASCII
