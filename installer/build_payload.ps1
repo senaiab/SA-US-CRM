@@ -246,52 +246,51 @@ if (!$csc) {
         throw "Neither csc.exe nor iexpress.exe could be found. Cannot build setup EXE."
     }
 
-    # Generate the .sed config dynamically so paths are always correct.
-    # Single-quoted here-string avoids variable-expansion / terminator issues;
-    # placeholders are swapped out with .Replace() afterwards.
-    $sedContent = @'
-[Version]
-Class=IEXPRESS
-SEDVersion=3
-
-[Options]
-PackagePurpose=InstallApp
-ShowInstallProgramWindow=0
-HideExtractAnimation=1
-UseLongFileName=1
-InsideCompressed=0
-CAB_FixedSize=0
-CAB_ResvCodeSigning=0
-RebootMode=N
-InstallPrompt=
-DisplayLicense=
-FinishMessage=SA-US ERP Setup is complete.
-TargetName=__OUTPUT_EXE__
-FriendlyName=SA-US ERP Setup
-AppLaunched=install.cmd
-PostInstallCmd=<None>
-AdminQuietInstCmd=
-UserQuietInstCmd=
-SourceFiles=SourceFiles
-
-[Strings]
-FILE0="install.cmd"
-FILE1="install.ps1"
-FILE2="prerequisites.cmd"
-FILE3="prerequisites.ps1"
-FILE4="payload.zip"
-
-[SourceFiles]
-SourceFiles0=__SRC_DIR__\
-
-[SourceFiles0]
-%FILE0%=
-%FILE1%=
-%FILE2%=
-%FILE3%=
-%FILE4%=
-'@
-    $sedContent = $sedContent.Replace('__OUTPUT_EXE__', $OutputExe).Replace('__SRC_DIR__', $srcDir)
+    # Build SED config as a string array (avoids here-string terminator issues
+    # caused by LF-only line endings in the checked-out file on Windows).
+    $sedLines = @(
+        "[Version]",
+        "Class=IEXPRESS",
+        "SEDVersion=3",
+        "",
+        "[Options]",
+        "PackagePurpose=InstallApp",
+        "ShowInstallProgramWindow=0",
+        "HideExtractAnimation=1",
+        "UseLongFileName=1",
+        "InsideCompressed=0",
+        "CAB_FixedSize=0",
+        "CAB_ResvCodeSigning=0",
+        "RebootMode=N",
+        "InstallPrompt=",
+        "DisplayLicense=",
+        "FinishMessage=SA-US ERP Setup is complete.",
+        "TargetName=$OutputExe",
+        "FriendlyName=SA-US ERP Setup",
+        "AppLaunched=install.cmd",
+        "PostInstallCmd=<None>",
+        "AdminQuietInstCmd=",
+        "UserQuietInstCmd=",
+        "SourceFiles=SourceFiles",
+        "",
+        "[Strings]",
+        'FILE0="install.cmd"',
+        'FILE1="install.ps1"',
+        'FILE2="prerequisites.cmd"',
+        'FILE3="prerequisites.ps1"',
+        'FILE4="payload.zip"',
+        "",
+        "[SourceFiles]",
+        "SourceFiles0=$srcDir\",
+        "",
+        "[SourceFiles0]",
+        "%FILE0%=",
+        "%FILE1%=",
+        "%FILE2%=",
+        "%FILE3%=",
+        "%FILE4%="
+    )
+    $sedContent = $sedLines -join "`r`n"
 
     $sedPath = Join-Path $env:TEMP "sa_us_erp_setup.sed"
     $sedContent | Out-File -FilePath $sedPath -Encoding ASCII
