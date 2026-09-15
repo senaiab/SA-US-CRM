@@ -30,7 +30,7 @@ def save_prefs(data):
 
 
 import requests
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 from PIL import Image, ImageTk
 
 if getattr(sys, "frozen", False):
@@ -267,6 +267,12 @@ class API:
         r = requests.post(f"{SERVER_URL}/admin/user", json=payload, headers=self.headers(), timeout=10)
         return self._handle(r).json()
 
+    def reset_user_password(self, username, new_password):
+        """Admin resets an existing user's password without touching role/full name."""
+        payload = {"username": username, "new_password": new_password}
+        r = requests.post(f"{SERVER_URL}/admin/user", json=payload, headers=self.headers(), timeout=10)
+        return self._handle(r).json()
+
     def change_own_password(self, current_password, new_password):
         payload = {"current_password": current_password, "new_password": new_password}
         r = requests.put(f"{SERVER_URL}/users/me/password", json=payload, headers=self.headers(), timeout=10)
@@ -483,8 +489,12 @@ class LoginWindow(Tk):
 
 # ─── Record Dialog ────────────────────────────────────────────────────────────
 
+# Modules where "Client Name" should autocomplete against existing Clients records
+CLIENT_LOOKUP_MODULES = ("leads", "quotations")
+
+
 class RecordDialog(Toplevel):
-    def __init__(self, parent, module, fields, api, record=None):
+    def __init__(self, parent, module, fields, api, record=None, prefill=None):
         super().__init__(parent)
         self.main_window = parent
         self.module = module
@@ -504,10 +514,20 @@ class RecordDialog(Toplevel):
         canvas.pack(side=LEFT, fill=BOTH, expand=True)
         scroll.pack(side=RIGHT, fill=Y)
 
-        data = (record or {}).get("data", {})
+        data = (record or {}).get("data", {}) or (prefill or {})
         for i, field in enumerate(fields):
             Label(frame, text=field, font=("Segoe UI", 9, "bold")).grid(row=i, column=0, sticky=W, padx=12, pady=6)
-            if field in DROPDOWNS:
+            if field == "Client Name" and module in CLIENT_LOOKUP_MODULES:
+                client_names = sorted({
+                    c.get("data", {}).get("Client Name", "").strip()
+                    for c in getattr(self.main_window, "records", {}).get("clients", [])
+                    if c.get("data", {}).get("Client Name", "").strip()
+                })
+                var = StringVar(value=str(data.get(field, "")))
+                entry = ttk.Combobox(frame, textvariable=var, values=client_names, width=58)
+                entry.bind("<<ComboboxSelected>>", self._autofill_from_client)
+                entry.bind("<FocusOut>", self._autofill_from_client)
+            elif field in DROPDOWNS:
                 var = StringVar(value=str(data.get(field, "")))
                 entry = ttk.Combobox(frame, textvariable=var, values=DROPDOWNS[field], width=58)
             elif field in ["Notes", "Remarks", "Reason", "Resolution", "Corrective Action", "Performance Notes", "Billing Address"]:
@@ -524,6 +544,33 @@ class RecordDialog(Toplevel):
         self.save_btn = Button(btn_frame, text="Save", bg=PRIMARY_COLOR, fg="white", command=self.save)
         self.save_btn.pack(side=LEFT, padx=4, ipadx=18, ipady=4)
         Button(btn_frame, text="Cancel", command=self.destroy).pack(side=LEFT, padx=4, ipadx=18, ipady=4)
+
+    def _autofill_from_client(self, event=None):
+        """When Client Name matches an existing Client record, pull its details into
+        empty fields on this form so staff don't retype what's already on file."""
+        if self.module not in CLIENT_LOOKUP_MODULES:
+            return
+        name = self.entries["Client Name"].get().strip()
+        if not name:
+            return
+        clients = getattr(self.main_window, "records", {}).get("clients", [])
+        match = next(
+            (c for c in clients if c.get("data", {}).get("Client Name", "").strip().lower() == name.lower()),
+            None,
+        )
+        if not match:
+            return
+        cdata = match.get("data", {})
+        if self.module == "leads":
+            mapping = {
+                "Company": cdata.get("Company", "").strip(),
+                "Phone/Email": " / ".join(p for p in [cdata.get("Phone", "").strip(), cdata.get("Email", "").strip()] if p),
+            }
+            for field, value in mapping.items():
+                widget = self.entries.get(field)
+                if widget is not None and value and not widget.get().strip():
+                    widget.delete(0, END)
+                    widget.insert(0, value)
 
     def save(self):
         data = {}
@@ -607,6 +654,66 @@ class ChangePasswordDialog(Toplevel):
             except Exception as e:
                 self.after(0, lambda: (
                     self.save_btn.config(state=NORMAL, text="Save Password"),
+                    self.status_lbl.config(text=str(e))
+                ))
+
+        threading.Thread(target=attempt, daemon=True).start()
+
+
+class AdminResetPasswordDialog(Toplevel):
+    """Owner/Business Manager resetting another user's forgotten password."""
+    def __init__(self, parent, api, username):
+        super().__init__(parent)
+        self.main_window = parent
+        self.api = api
+        self.username = username
+        self.title(f"Reset Password — {username}")
+        self.geometry("360x230")
+        self.resizable(False, False)
+        self.grab_set()
+        set_window_icon(self)
+
+        frm = Frame(self, padx=24, pady=20)
+        frm.pack(fill=BOTH, expand=True)
+
+        Label(frm, text=f"New password for '{username}'", font=("Segoe UI", 10, "bold")).grid(row=0, column=0, columnspan=2, pady=(0, 12))
+
+        Label(frm, text="New Password").grid(row=1, column=0, sticky=W, pady=8)
+        self.new_pw = Entry(frm, show="*", width=26)
+        self.new_pw.grid(row=1, column=1, pady=8, padx=8)
+
+        Label(frm, text="Confirm New").grid(row=2, column=0, sticky=W, pady=8)
+        self.conf_pw = Entry(frm, show="*", width=26)
+        self.conf_pw.grid(row=2, column=1, pady=8, padx=8)
+
+        self.status_lbl = Label(frm, text="", fg="#dc2626", font=("Segoe UI", 9))
+        self.status_lbl.grid(row=3, column=0, columnspan=2, pady=(4, 0))
+
+        self.save_btn = Button(frm, text="Reset Password", bg=PRIMARY_COLOR, fg="white", command=self._do_reset)
+        self.save_btn.grid(row=4, column=0, columnspan=2, sticky=EW, pady=10)
+
+        self.new_pw.focus_set()
+        self.bind("<Return>", lambda e: self._do_reset())
+
+    def _do_reset(self):
+        new, confirm = self.new_pw.get(), self.conf_pw.get()
+        if new != confirm:
+            self.status_lbl.config(text="Passwords do not match.")
+            return
+        if len(new) < 8:
+            self.status_lbl.config(text="Password must be at least 8 characters.")
+            return
+        self.save_btn.config(state=DISABLED, text="Resetting...")
+
+        def attempt():
+            try:
+                self.api.reset_user_password(self.username, new)
+                self.after(0, lambda: (messagebox.showinfo("Done", f"Password reset for '{self.username}'."), self.destroy()))
+            except TokenExpiredError:
+                self.after(0, lambda: (self.destroy(), self.main_window._handle_session_expired()))
+            except Exception as e:
+                self.after(0, lambda: (
+                    self.save_btn.config(state=NORMAL, text="Reset Password"),
                     self.status_lbl.config(text=str(e))
                 ))
 
@@ -723,6 +830,7 @@ class MainWindow(Tk):
         toolbar = Frame(frame)
         toolbar.pack(fill=X, pady=6)
         Button(toolbar, text="Refresh Users", command=self._load_user_list).pack(side=LEFT, padx=8)
+        Button(toolbar, text="Reset Password", bg=PRIMARY_COLOR, fg="white", command=self._reset_selected_user_password).pack(side=LEFT, padx=4)
         Button(toolbar, text="Deactivate Selected", fg="#b91c1c", command=self._deactivate_user).pack(side=LEFT, padx=4)
         Button(toolbar, text="Activate Selected", fg="#166534", command=self._activate_user).pack(side=LEFT, padx=4)
 
@@ -754,6 +862,13 @@ class MainWindow(Tk):
         for u in users:
             status = "Active" if u.get("is_active") else "Inactive"
             self.users_tree.insert("", END, iid=u["username"], values=[u["username"], u.get("full_name", ""), u.get("role", ""), status, u.get("created_at", "")])
+
+    def _reset_selected_user_password(self):
+        sel = self.users_tree.selection()
+        if not sel:
+            messagebox.showwarning("Select user", "Select a user to reset the password for.")
+            return
+        AdminResetPasswordDialog(self, self.api, sel[0])
 
     def _deactivate_user(self):
         sel = self.users_tree.selection()
@@ -944,7 +1059,11 @@ class MainWindow(Tk):
         Button(toolbar, text="Add", bg=PRIMARY_COLOR, fg="white", command=lambda m=module: self.open_dialog(m)).pack(side=LEFT, padx=12)
         Button(toolbar, text="Edit Selected", command=lambda m=module: self.edit_selected(m)).pack(side=LEFT, padx=4)
         Button(toolbar, text="Delete Selected", command=lambda m=module: self.delete_selected(m)).pack(side=LEFT, padx=4)
+        if module == "clients":
+            Button(toolbar, text="New Quotation", command=self.new_quotation_for_client).pack(side=LEFT, padx=4)
         Button(toolbar, text="Export Excel", command=lambda m=module: self.export_excel(m)).pack(side=RIGHT, padx=8)
+        if module == "clients":
+            Button(toolbar, text="Import Excel", command=self.import_excel_clients).pack(side=RIGHT, padx=4)
 
         # Treeview
         cols = ["ID"] + self.modules[module]
@@ -1109,6 +1228,84 @@ class MainWindow(Tk):
                 self.after(0, self._handle_session_expired)
             except Exception as e:
                 self.after(0, lambda: messagebox.showerror("Export failed", str(e)))
+
+        threading.Thread(target=do, daemon=True).start()
+
+    def new_quotation_for_client(self):
+        """Open a new Quotation prefilled with an existing client's name — no Lead required."""
+        rec = self.selected_record("clients")
+        if not rec:
+            messagebox.showwarning("Select client", "Select a client first.")
+            return
+        name = rec.get("data", {}).get("Client Name", "")
+        self.current_module = "quotations"
+        RecordDialog(self, "quotations", self.modules["quotations"], self.api, record=None, prefill={"Client Name": name})
+
+    def import_excel_clients(self):
+        """Bulk-upload a company/client list from an .xlsx file into the Clients module."""
+        path = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx")])
+        if not path:
+            return
+        fields = self.modules["clients"]
+
+        def do():
+            try:
+                wb = load_workbook(path, read_only=True, data_only=True)
+                ws = wb.active
+                rows = ws.iter_rows(values_only=True)
+                header = next(rows, None)
+                if not header:
+                    raise ValueError("The spreadsheet is empty.")
+
+                field_by_lower = {f.lower(): f for f in fields}
+                col_map = {}
+                for idx, h in enumerate(header):
+                    if h is None:
+                        continue
+                    field = field_by_lower.get(str(h).strip().lower())
+                    if field:
+                        col_map[idx] = field
+                if not col_map:
+                    raise ValueError("No matching columns found. Expected headers: " + ", ".join(fields))
+
+                existing = self.records.get("clients", [])
+                existing_keys = {
+                    (r.get("data", {}).get("Client Name", "").strip().lower(), r.get("data", {}).get("Company", "").strip().lower())
+                    for r in existing
+                }
+
+                imported = skipped = failed = 0
+                for row in rows:
+                    if row is None or all(v is None for v in row):
+                        continue
+                    data = {f: "" for f in fields}
+                    for idx, field in col_map.items():
+                        if idx < len(row) and row[idx] is not None:
+                            data[field] = str(row[idx]).strip()
+                    name = data.get("Client Name", "").strip()
+                    if not name:
+                        continue
+                    key = (name.lower(), data.get("Company", "").strip().lower())
+                    if key in existing_keys:
+                        skipped += 1
+                        continue
+                    try:
+                        self.api.save_record("clients", fields, data)
+                        existing_keys.add(key)
+                        imported += 1
+                    except TokenExpiredError:
+                        raise
+                    except Exception:
+                        failed += 1
+
+                msg = f"Imported {imported} client(s). Skipped {skipped} duplicate(s)."
+                if failed:
+                    msg += f" {failed} row(s) failed."
+                self.after(0, lambda: (messagebox.showinfo("Import complete", msg), self.load_records("clients"), self.load_dashboard()))
+            except TokenExpiredError:
+                self.after(0, self._handle_session_expired)
+            except Exception as e:
+                self.after(0, lambda: messagebox.showerror("Import failed", str(e)))
 
         threading.Thread(target=do, daemon=True).start()
 

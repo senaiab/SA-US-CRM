@@ -321,6 +321,7 @@ const API = {
   deactivate(u)    { return this.req('POST',`/admin/users/${u}/deactivate`); },
   activate(u)      { return this.req('POST',`/admin/users/${u}/activate`); },
   saveUser(d)      { return this.req('POST','/admin/user',d); },
+  resetPassword(u,np) { return this.req('POST','/admin/user',{username:u,new_password:np}); },
   chgPwd(cur,nw)   { return this.req('PUT','/users/me/password',{current_password:cur,new_password:nw}); },
   search(q)        { return this.req('GET',`/search?q=${encodeURIComponent(q)}`); },
 };
@@ -677,15 +678,31 @@ async function loadAdminUsers() {
         <td><b>${esc(u.username)}</b><br><small style="color:var(--gray)">${esc(u.full_name)}</small></td>
         <td><span class="badge badge-blue">${esc(u.role)}</span></td>
         <td><span class="badge ${active?'badge-green':'badge-red'}">${active?'Active':'Inactive'}</span></td>
-        <td>${active
-          ?`<button class="btn btn-danger btn-sm" onclick="toggleUser('${esc(u.username)}',false)">Deactivate</button>`
-          :`<button class="btn btn-success btn-sm" onclick="toggleUser('${esc(u.username)}',true)">Activate</button>`
-        }</td>
+        <td>
+          <button class="btn btn-outline btn-sm" onclick="resetUserPassword('${esc(u.username)}')">Reset Password</button>
+          ${active
+            ?`<button class="btn btn-danger btn-sm" onclick="toggleUser('${esc(u.username)}',false)">Deactivate</button>`
+            :`<button class="btn btn-success btn-sm" onclick="toggleUser('${esc(u.username)}',true)">Activate</button>`
+          }
+        </td>
       </tr>`;
     });
     h += '</table></div>';
     document.getElementById('admin-users-pane').innerHTML = h;
   } catch(e){ document.getElementById('admin-users-pane').innerHTML=`<div class="empty"><p>${e.message}</p></div>`; }
+}
+
+async function resetUserPassword(username) {
+  const pw = prompt(`New password for '${username}' (min 8 characters):`);
+  if (pw === null) return;
+  if (pw.length < 8) { toast('Password must be at least 8 characters.', 4000); return; }
+  const confirmPw = prompt('Confirm new password:');
+  if (confirmPw === null) return;
+  if (pw !== confirmPw) { toast('Passwords do not match.', 4000); return; }
+  try {
+    await API.resetPassword(username, pw);
+    toast(`Password reset for '${username}'.`);
+  } catch(e){ toast('Error: '+e.message, 4000); }
 }
 
 async function toggleUser(username, activate) {
