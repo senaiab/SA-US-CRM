@@ -492,6 +492,20 @@ class LoginWindow(Tk):
 # Modules where "Client Name" should autocomplete against existing Clients records
 CLIENT_LOOKUP_MODULES = ("leads", "quotations")
 
+# Fields the server assigns itself on save and will not let anyone change afterward.
+AUTO_ID_FIELDS = {
+    "leads": {"id_field": "Lead ID", "date_field": "Inquiry Date"},
+    "quotations": {"id_field": "Quote ID", "date_field": "Quote Date"},
+    "complaints": {"id_field": "Complaint ID", "date_field": "Date Received"},
+    "bookings": {"date_field": "Booking Date"},
+}
+
+# Optional pick-an-existing-record fields: {module: {field_name: source_module}}
+CROSS_REF_FIELDS = {
+    "quotations": {"Lead ID": "leads"},
+    "bookings": {"Quote ID": "quotations"},
+}
+
 
 class RecordDialog(Toplevel):
     def __init__(self, parent, module, fields, api, record=None, prefill=None):
@@ -515,9 +529,26 @@ class RecordDialog(Toplevel):
         scroll.pack(side=RIGHT, fill=Y)
 
         data = (record or {}).get("data", {}) or (prefill or {})
+        auto_cfg = AUTO_ID_FIELDS.get(module, {})
+        cross_ref = CROSS_REF_FIELDS.get(module, {})
         for i, field in enumerate(fields):
             Label(frame, text=field, font=("Segoe UI", 9, "bold")).grid(row=i, column=0, sticky=W, padx=12, pady=6)
-            if field == "Client Name" and module in CLIENT_LOOKUP_MODULES:
+            if field in (auto_cfg.get("id_field"), auto_cfg.get("date_field")):
+                entry = Entry(frame, width=62)
+                existing = str(data.get(field, ""))
+                entry.insert(0, existing or "(assigned automatically on save)")
+                entry.config(state=DISABLED)
+            elif field in cross_ref:
+                source_module = cross_ref[field]
+                source_id_field = AUTO_ID_FIELDS.get(source_module, {}).get("id_field", field)
+                ref_ids = sorted({
+                    r.get("data", {}).get(source_id_field, "").strip()
+                    for r in getattr(self.main_window, "records", {}).get(source_module, [])
+                    if r.get("data", {}).get(source_id_field, "").strip()
+                })
+                var = StringVar(value=str(data.get(field, "")))
+                entry = ttk.Combobox(frame, textvariable=var, values=[""] + ref_ids, width=58)
+            elif field == "Client Name" and module in CLIENT_LOOKUP_MODULES:
                 client_names = sorted({
                     c.get("data", {}).get("Client Name", "").strip()
                     for c in getattr(self.main_window, "records", {}).get("clients", [])
@@ -585,8 +616,17 @@ class RecordDialog(Toplevel):
             try:
                 record_id = self.record.get("id") if self.record else None
                 version = self.record.get("version") if self.record else None
-                self.api.save_record(self.module, self.fields, data, record_id, version=version)
-                self.after(0, lambda: (self.main_window.refresh_current_tab(), self.destroy()))
+                saved = self.api.save_record(self.module, self.fields, data, record_id, version=version)
+                id_field = AUTO_ID_FIELDS.get(self.module, {}).get("id_field")
+                new_id = None
+                if record_id is None and id_field:
+                    new_id = saved.get("data", {}).get(id_field)
+                def _finish():
+                    self.main_window.refresh_current_tab()
+                    self.destroy()
+                    if new_id:
+                        messagebox.showinfo("Saved", f"{self.module.title()[:-1]} created as {new_id}.")
+                self.after(0, _finish)
             except TokenExpiredError:
                 self.after(0, lambda: (self.destroy(), self.main_window._handle_session_expired()))
             except Exception as e:

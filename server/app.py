@@ -1,5 +1,6 @@
 import configparser
 import json
+import threading
 import time
 from collections import defaultdict
 from contextlib import asynccontextmanager
@@ -143,6 +144,35 @@ MODULES = {
     "clients": ["Client ID", "Client Name", "Company", "Phone", "Email", "Client Type", "Credit Limit", "Payment Terms", "Billing Address", "Notes"],
     "suppliers": ["Supplier ID", "Supplier Name", "Service Type", "Contact", "Phone/Email", "Payment Terms", "Status", "Performance Notes"],
 }
+
+# Fields the server assigns itself on create and refuses to let any client change afterward.
+# No id_field means that module's own identifier stays manual (e.g. Booking Ref holds a
+# supplier/airline confirmation code, not an internal ID).
+AUTO_ID_FIELDS = {
+    "leads": {"id_field": "Lead ID", "date_field": "Inquiry Date", "prefix": "L"},
+    "quotations": {"id_field": "Quote ID", "date_field": "Quote Date", "prefix": "Q"},
+    "complaints": {"id_field": "Complaint ID", "date_field": "Date Received", "prefix": "C"},
+    "bookings": {"date_field": "Booking Date"},
+}
+
+_id_seq_lock = threading.Lock()
+
+
+def _generate_sequence_id(db: Session, module: str, prefix: str) -> str:
+    """Builds PREFIX-YYYYMMDD-NNN, sequential per day per module. Uniqueness is only
+    guaranteed within a single server process, which matches how this app is deployed
+    (one uvicorn process, no --workers)."""
+    today = utcnow().strftime("%Y%m%d")
+    pattern = f"{prefix}-{today}-%"
+    with _id_seq_lock:
+        codes = db.query(CRMRecord.code).filter(CRMRecord.module == module, CRMRecord.code.like(pattern)).all()
+        max_seq = 0
+        for (code,) in codes:
+            try:
+                max_seq = max(max_seq, int(code.rsplit("-", 1)[-1]))
+            except (ValueError, AttributeError):
+                pass
+        return f"{prefix}-{today}-{max_seq + 1:03d}"
 
 ROLE_PERMISSIONS = {
     "Owner": ["*"],
@@ -348,6 +378,13 @@ def create_record(record: RecordIn, user: User = Depends(get_current_user), db: 
         raise HTTPException(404, "Unknown module")
     if not can_access(user, record.module, write=True):
         raise HTTPException(403, "Not allowed")
+    auto_cfg = AUTO_ID_FIELDS.get(record.module)
+    if auto_cfg:
+        if "id_field" in auto_cfg:
+            record.data[auto_cfg["id_field"]] = _generate_sequence_id(db, record.module, auto_cfg["prefix"])
+            record.code = record.data[auto_cfg["id_field"]]
+        if "date_field" in auto_cfg:
+            record.data[auto_cfg["date_field"]] = utcnow().date().isoformat()
     db_record = CRMRecord(module=record.module, code=record.code, title=record.title, data=record.data, created_by=user.username, updated_by=user.username)
     db.add(db_record)
     db.flush()
@@ -366,6 +403,13 @@ def update_record(record_id: int, record: RecordIn, user: User = Depends(get_cur
         raise HTTPException(403, "Not allowed")
     if record.version is not None and record.version != db_record.version:
         raise HTTPException(409, "Record was modified by another user. Reload and try again.")
+    auto_cfg = AUTO_ID_FIELDS.get(db_record.module)
+    if auto_cfg:
+        if "id_field" in auto_cfg:
+            record.data[auto_cfg["id_field"]] = db_record.data.get(auto_cfg["id_field"])
+            record.code = db_record.code
+        if "date_field" in auto_cfg:
+            record.data[auto_cfg["date_field"]] = db_record.data.get(auto_cfg["date_field"])
     db_record.code = record.code
     db_record.title = record.title
     db_record.data = record.data
