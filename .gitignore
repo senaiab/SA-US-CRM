@@ -24,6 +24,13 @@ nuitka-crash-report.xml
 # ─── Release output (compiled EXEs, payload ZIPs) ────────────────────────────
 release/
 
+# ─── Android app build artifacts (buildozer cache + output APKs) ────────────
+# These are symlinks to an out-of-repo build cache on this machine, not real
+# directories, so trailing-slash patterns won't match them.
+android/.buildozer
+android/bin
+android/.venv
+
 # ─── Loose ZIP archives ───────────────────────────────────────────────────────
 windows_scripts.zip
 *.zip
