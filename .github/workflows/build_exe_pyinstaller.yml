@@ -58,6 +58,7 @@ jobs:
             client_app.py
 
       - name: Copy runtime config files
+        shell: pwsh
         run: |
           if (Test-Path "server\server_config.example.ini") {
             Copy-Item "server\server_config.example.ini" "dist\server\"
@@ -68,8 +69,9 @@ jobs:
           if (Test-Path "client\tenant_branding.json") {
             Copy-Item "client\tenant_branding.json" "dist\client\"
           }
-          xcopy /E /I client\branding dist\client\branding
-        shell: cmd
+          if (Test-Path "client\branding") {
+            Copy-Item -Recurse "client\branding" "dist\client\branding"
+          }
 
       - name: Assemble and build SA-US-ERP-Setup.exe
         shell: pwsh
