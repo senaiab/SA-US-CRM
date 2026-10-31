@@ -1,0 +1,214 @@
+name: Build Installers (PyInstaller)
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*-pyinstaller'
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller pillow
+          pip install -r server/requirements.txt
+          pip install -r client/requirements.txt
+
+      - name: Convert PNG icon to ICO
+        run: |
+          python - <<'EOF'
+          from PIL import Image
+          img = Image.open("client/branding/app_logo.png").convert("RGBA")
+          sizes = [(16,16),(32,32),(48,48),(64,64),(128,128),(256,256)]
+          imgs = [img.resize(s, Image.LANCZOS) for s in sizes]
+          imgs[0].save("build_icon.ico", format="ICO", sizes=sizes, append_images=imgs[1:])
+          print("Icon converted.")
+          EOF
+        shell: bash
+
+      - name: Build Server EXE
+        run: |
+          cd server
+          pyinstaller --clean --noconfirm --onefile `
+            --name SA_US_ERP_Server `
+            --hidden-import passlib.handlers.bcrypt `
+            --hidden-import passlib.handlers.pbkdf2 `
+            --distpath ..\dist\server `
+            app.py
+
+      - name: Build Client EXE
+        run: |
+          cd client
+          pyinstaller --clean --noconfirm --onefile --windowed `
+            --name SA_US_ERP_Client `
+            --icon ..\build_icon.ico `
+            --distpath ..\dist\client `
+            --add-data "branding;branding" `
+            client_app.py
+
+      - name: Copy runtime config files
+        run: |
+          if (Test-Path "server\server_config.example.ini") {
+            Copy-Item "server\server_config.example.ini" "dist\server\"
+          }
+          if (Test-Path "client\client_config.ini") {
+            Copy-Item "client\client_config.ini" "dist\client\"
+          }
+          if (Test-Path "client\tenant_branding.json") {
+            Copy-Item "client\tenant_branding.json" "dist\client\"
+          }
+          xcopy /E /I client\branding dist\client\branding
+        shell: cmd
+
+      - name: Assemble and build SA-US-ERP-Setup.exe
+        shell: pwsh
+        run: |
+          $root    = $env:GITHUB_WORKSPACE
+          $payload = "$root\release\payload"
+          $srcDir  = "$root\release\installer_source"
+          $outExe  = "$root\release\SA-US-ERP-Setup.exe"
+
+          foreach ($d in @("$payload\server","$payload\client","$payload\sql","$payload\uninstall","$srcDir")) {
+            New-Item -ItemType Directory -Force -Path $d | Out-Null
+          }
+
+          Copy-Item "$root\dist\server\SA_US_ERP_Server.exe" "$payload\server\"
+          Copy-Item "$root\dist\client\SA_US_ERP_Client.exe" "$payload\client\"
+          Copy-Item -Recurse "$root\dist\client\branding"    "$payload\client\branding"
+          Copy-Item -Recurse "$root\sql\."                   "$payload\sql\"
+          if (Test-Path "$root\server\server_config.example.ini") {
+            Copy-Item "$root\server\server_config.example.ini" "$payload\server\"
+          }
+
+          foreach ($f in @("install.cmd","install.ps1","prerequisites.cmd","prerequisites.ps1")) {
+            Copy-Item "$root\installer\$f" "$payload\$f"
+            Copy-Item "$root\installer\$f" "$srcDir\$f"
+          }
+          foreach ($f in @("uninstall.cmd","uninstall.ps1")) {
+            if (Test-Path "$root\installer\$f") {
+              Copy-Item "$root\installer\$f" "$payload\uninstall\$f"
+            }
+          }
+
+          $zipPath = "$srcDir\payload.zip"
+          Compress-Archive -Path $payload -DestinationPath $zipPath -CompressionLevel Optimal
+
+          $csc = Get-ChildItem "$env:SystemRoot\Microsoft.NET\Framework64" -Filter csc.exe -Recurse -ErrorAction SilentlyContinue |
+                 Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
+          if (-not $csc) { throw "csc.exe not found" }
+          Write-Host "Using CSC: $csc"
+
+          New-Item -ItemType Directory -Force (Split-Path $outExe) | Out-Null
+
+          & $csc /target:winexe /optimize+ /nologo `
+            "/out:$outExe" `
+            "/resource:$zipPath,payload.zip" `
+            "/resource:$srcDir\install.cmd,install.cmd" `
+            "/resource:$srcDir\install.ps1,install.ps1" `
+            "$root\installer\SetupBootstrapper.cs"
+
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Write-Host "Setup EXE: $((Get-Item $outExe).Length / 1MB -as [int]) MB"
+
+      - name: Upload Windows Installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: SA-US-ERP-Setup-Windows
+          path: release/SA-US-ERP-Setup.exe
+          retention-days: 30
+
+      - name: Upload raw Server EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: SA_US_ERP_Server_Windows_raw
+          path: dist/server/SA_US_ERP_Server.exe
+          retention-days: 14
+
+      - name: Upload raw Client EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: SA_US_ERP_Client_Windows_raw
+          path: dist/client/SA_US_ERP_Client.exe
+          retention-days: 14
+
+  build-macos:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller pillow
+          pip install -r server/requirements.txt
+          pip install -r client/requirements.txt
+
+      - name: Convert PNG icon to ICNS
+        run: |
+          python - <<'EOF'
+          import subprocess, os
+          from PIL import Image
+          img = Image.open("client/branding/app_logo.png").convert("RGBA")
+          iconset = "build_icon.iconset"
+          os.makedirs(iconset, exist_ok=True)
+          for size in [16, 32, 64, 128, 256, 512]:
+              img.resize((size, size), Image.LANCZOS).save(f"{iconset}/icon_{size}x{size}.png")
+              img.resize((size*2, size*2), Image.LANCZOS).save(f"{iconset}/icon_{size}x{size}@2x.png")
+          subprocess.run(["iconutil", "-c", "icns", iconset, "-o", "build_icon.icns"], check=True)
+          print("ICNS created.")
+          EOF
+
+      - name: Build Server binary
+        run: |
+          pyinstaller --onefile --name SA_US_ERP_Server \
+            --distpath dist/server \
+            server/app.py
+
+      - name: Build Client binary
+        run: |
+          pyinstaller --onefile --windowed \
+            --name SA_US_ERP_Client \
+            --icon build_icon.icns \
+            --distpath dist/client \
+            --add-data "client/branding:branding" \
+            client/client_app.py
+
+      - name: Assemble macOS installer package
+        run: |
+          PKG="release/SA-US-ERP-macOS"
+          mkdir -p "$PKG/server" "$PKG/client" "$PKG/sql"
+          cp dist/server/SA_US_ERP_Server "$PKG/server/"
+          cp dist/client/SA_US_ERP_Client "$PKG/client/"
+          cp -r client/branding "$PKG/client/branding"
+          cp sql/create_database.sql "$PKG/sql/"
+          cp server/server_config.example.ini "$PKG/server/"
+          cp installer/macos/install.sh "$PKG/install.sh"
+          chmod +x "$PKG/install.sh" "$PKG/server/SA_US_ERP_Server" "$PKG/client/SA_US_ERP_Client"
+          hdiutil create -volname "SA-US ERP" \
+            -srcfolder "$PKG" \
+            -ov -format UDZO \
+            "release/SA-US-ERP-macOS.dmg"
+
+      - name: Upload macOS Installer DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: SA-US-ERP-macOS-DMG
+          path: release/SA-US-ERP-macOS.dmg
+          retention-days: 30
