@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$InstallDir = "$env:LOCALAPPDATA\Programs\SA-US ERP",
     [ValidateSet("", "server", "client", "both")]
     [string]$InstallMode = "",
@@ -201,7 +201,7 @@ function Set-MariaDbRootPassword {
     Add-Type -AssemblyName System.Drawing
 
     $form = New-Object System.Windows.Forms.Form
-    $form.Text            = "SA-US ERP — Set MariaDB Root Password"
+    $form.Text            = "SA-US ERP - Set MariaDB Root Password"
     $form.Size            = New-Object System.Drawing.Size(500, 290)
     $form.StartPosition   = "CenterScreen"
     $form.FormBorderStyle = "FixedDialog"
@@ -287,7 +287,7 @@ function Set-MariaDbRootPassword {
             # Save credentials file
             $credFile = Join-Path $InstallDir "DATABASE_CREDENTIALS.txt"
             @"
-SA-US ERP — Database Administrator Credentials
+SA-US ERP - Database Administrator Credentials
 Created: $(Get-Date -Format "yyyy-MM-dd HH:mm")
 ============================================================
 
@@ -341,7 +341,7 @@ function Initialize-Database {
 
     $sqlFile = Join-Path $InstallDir "sql\create_database.sql"
     if (!(Test-Path -LiteralPath $sqlFile)) {
-        Write-Host "SQL script not found at $sqlFile — skipping database setup." -ForegroundColor Yellow
+        Write-Host "SQL script not found at $sqlFile - skipping database setup." -ForegroundColor Yellow
         return
     }
 
@@ -353,7 +353,7 @@ function Initialize-Database {
 
     # ── Build the dialog ──────────────────────────────────────────────────────
     $form = New-Object System.Windows.Forms.Form
-    $form.Text     = "SA-US ERP — Database Setup"
+    $form.Text     = "SA-US ERP - Database Setup"
     $form.Size     = New-Object System.Drawing.Size(500, 310)
     $form.StartPosition   = "CenterScreen"
     $form.FormBorderStyle = "FixedDialog"
@@ -363,7 +363,7 @@ function Initialize-Database {
     # Info text
     $info = New-Object System.Windows.Forms.Label
     if ($mysql) {
-        $info.Text = "SA-US ERP will now create its database and user on this machine.`n`nEnter your MySQL / MariaDB ROOT password below, then click`n""Create Database"".  Leave blank if root has no password.`n`n(Safe to run again — uses CREATE IF NOT EXISTS.)"
+        $info.Text = "SA-US ERP will now create its database and user on this machine.`n`nEnter your MySQL / MariaDB ROOT password below, then click`n""Create Database"".  Leave blank if root has no password.`n`n(Safe to run again - uses CREATE IF NOT EXISTS.)"
     } else {
         $info.Text = "mysql.exe was not found in PATH or common install locations.`n`nYou can still skip this step and create the database manually`nby running the SQL script at:`n`n   $sqlFile"
     }
@@ -427,12 +427,12 @@ function Initialize-Database {
 
         $rootPw = $pwBox.Text
 
-        # Build cmd.exe command — pipe SQL file via stdin redirection
+        # Build cmd.exe command - pipe SQL file via stdin redirection
         # Use cmd /c so we get proper < redirection support
         $escapedSql   = $sqlFile.Replace('"', '""')
         $escapedMysql = $mysql.Replace('"', '""')
         if ($rootPw) {
-            # -p with no space before password — standard mysql syntax
+            # -p with no space before password - standard mysql syntax
             $mysqlArgs = "-u root -p$rootPw"
         } else {
             $mysqlArgs = "-u root"
