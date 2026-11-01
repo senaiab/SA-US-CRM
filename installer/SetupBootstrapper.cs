@@ -151,7 +151,7 @@ namespace SaUsErpInstaller
         private TabPage BuildPage0_Welcome()
         {
             var p = NewPage();
-            p.Controls.Add(MakeTitle("Welcome to SA-US ERP Setup v2.5.0", 24, 18));
+            p.Controls.Add(MakeTitle("Welcome to SA-US ERP Setup v2.6.0", 24, 18));
             p.Controls.Add(MakeLabel(
                 "This wizard will install SA-US ERP on your computer.\r\n\r\n" +
                 "SA-US ERP is a business management system that includes:\r\n\r\n" +
@@ -366,7 +366,7 @@ namespace SaUsErpInstaller
                 "SA-US-ERP-" + Guid.NewGuid().ToString("N").Substring(0, 10));
             try
             {
-                Log("SA-US ERP Installer v2.5.0", Color.FromArgb(110, 185, 255));
+                Log("SA-US ERP Installer v2.6.0", Color.FromArgb(110, 185, 255));
                 Log(new string('-', 44), Color.FromArgb(70, 70, 70));
                 Log("Extracting installer resources...");
 
@@ -447,7 +447,7 @@ namespace SaUsErpInstaller
                 _lblDoneTitle.Text      = "Installation Complete!";
                 _lblDoneTitle.ForeColor = Color.FromArgb(0, 140, 0);
                 _lblDoneDetail.Text     =
-                    "SA-US ERP v2.5.0 has been installed to:\r\n" + _installDir +
+                    "SA-US ERP v2.6.0 has been installed to:\r\n" + _installDir +
                     "\r\n\r\nShortcuts have been created on the Desktop and Start Menu.";
                 _btnOpenFolder.Enabled  = true;
             }

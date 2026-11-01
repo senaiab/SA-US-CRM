@@ -812,7 +812,7 @@ start "" "%InstallDir%"
     $uninstallKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\SA-US ERP"
     New-Item -Path $uninstallKey -Force | Out-Null
     New-ItemProperty -Path $uninstallKey -Name "DisplayName" -Value "SA-US ERP" -PropertyType String -Force | Out-Null
-    New-ItemProperty -Path $uninstallKey -Name "DisplayVersion" -Value "2.5.0" -PropertyType String -Force | Out-Null
+    New-ItemProperty -Path $uninstallKey -Name "DisplayVersion" -Value "2.6.0" -PropertyType String -Force | Out-Null
     New-ItemProperty -Path $uninstallKey -Name "Publisher" -Value "SA Ultimate Solutions" -PropertyType String -Force | Out-Null
     New-ItemProperty -Path $uninstallKey -Name "InstallLocation" -Value $InstallDir -PropertyType String -Force | Out-Null
     New-ItemProperty -Path $uninstallKey -Name "UninstallString" -Value "`"$InstallDir\uninstall.cmd`"" -PropertyType String -Force | Out-Null
