@@ -216,19 +216,33 @@ port=3306
 
     # Initialize data directory if not already done
     if (!(Test-Path -LiteralPath (Join-Path $dataDir "mysql"))) {
+        # Remove any partial files from a previous failed attempt before re-initializing
+        if (Test-Path -LiteralPath $dataDir) {
+            Remove-Item -LiteralPath $dataDir -Recurse -Force -ErrorAction SilentlyContinue
+        }
+        New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
+
         Write-Host "Initializing MariaDB data directory (this may take a moment)..."
         $psi = New-Object System.Diagnostics.ProcessStartInfo
         $psi.FileName        = $mysqld
-        $psi.Arguments       = "--initialize-insecure --datadir=`"$dataDir`""
+        # --console forces MariaDB to write to stdout/stderr instead of its log file
+        $psi.Arguments       = "--initialize-insecure --datadir=`"$dataDir`" --console"
         $psi.UseShellExecute = $false
         $psi.CreateNoWindow  = $true
         $psi.RedirectStandardError  = $true
         $psi.RedirectStandardOutput = $true
         $initProc = [System.Diagnostics.Process]::Start($psi)
-        $initErr  = $initProc.StandardError.ReadToEnd()
+        # Collect both streams asynchronously to avoid deadlock
+        $outBuf = New-Object System.Text.StringBuilder
+        $errBuf = New-Object System.Text.StringBuilder
+        $initProc.add_OutputDataReceived({ param($s,$e); if ($e.Data -ne $null) { [void]$outBuf.AppendLine($e.Data) } })
+        $initProc.add_ErrorDataReceived({  param($s,$e); if ($e.Data -ne $null) { [void]$errBuf.AppendLine($e.Data) } })
+        $initProc.BeginOutputReadLine()
+        $initProc.BeginErrorReadLine()
         $initProc.WaitForExit()
         if ($initProc.ExitCode -ne 0) {
-            throw "MariaDB data directory init failed (exit $($initProc.ExitCode)): $($initErr.Trim())"
+            $initMsg = ("$outBuf`n$errBuf").Trim()
+            throw "MariaDB data directory init failed (exit $($initProc.ExitCode)): $initMsg"
         }
     }
 
@@ -247,11 +261,17 @@ port=3306
     $psi2.CreateNoWindow  = $true
     $psi2.RedirectStandardError  = $true
     $psi2.RedirectStandardOutput = $true
-    $svcProc = [System.Diagnostics.Process]::Start($psi2)
-    $svcErr  = $svcProc.StandardError.ReadToEnd()
+    $svcProc  = [System.Diagnostics.Process]::Start($psi2)
+    $svcOut2  = New-Object System.Text.StringBuilder
+    $svcErr2  = New-Object System.Text.StringBuilder
+    $svcProc.add_OutputDataReceived({ param($s,$e); if ($e.Data -ne $null) { [void]$svcOut2.AppendLine($e.Data) } })
+    $svcProc.add_ErrorDataReceived({  param($s,$e); if ($e.Data -ne $null) { [void]$svcErr2.AppendLine($e.Data) } })
+    $svcProc.BeginOutputReadLine()
+    $svcProc.BeginErrorReadLine()
     $svcProc.WaitForExit()
     if ($svcProc.ExitCode -ne 0) {
-        throw "MariaDB service registration failed (exit $($svcProc.ExitCode)): $($svcErr.Trim())"
+        $svcMsg = ("$svcOut2`n$svcErr2").Trim()
+        throw "MariaDB service registration failed (exit $($svcProc.ExitCode)): $svcMsg"
     }
 
     & sc.exe config $svcName start= auto 2>$null | Out-Null
@@ -831,7 +851,7 @@ start "" "%InstallDir%"
     $uninstallKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\SA-US ERP"
     New-Item -Path $uninstallKey -Force | Out-Null
     New-ItemProperty -Path $uninstallKey -Name "DisplayName" -Value "SA-US ERP" -PropertyType String -Force | Out-Null
-    New-ItemProperty -Path $uninstallKey -Name "DisplayVersion" -Value "2.6.1" -PropertyType String -Force | Out-Null
+    New-ItemProperty -Path $uninstallKey -Name "DisplayVersion" -Value "2.6.2" -PropertyType String -Force | Out-Null
     New-ItemProperty -Path $uninstallKey -Name "Publisher" -Value "SA Ultimate Solutions" -PropertyType String -Force | Out-Null
     New-ItemProperty -Path $uninstallKey -Name "InstallLocation" -Value $InstallDir -PropertyType String -Force | Out-Null
     New-ItemProperty -Path $uninstallKey -Name "UninstallString" -Value "`"$InstallDir\uninstall.cmd`"" -PropertyType String -Force | Out-Null
