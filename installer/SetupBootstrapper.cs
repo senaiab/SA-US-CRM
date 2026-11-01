@@ -248,7 +248,29 @@ namespace SaUsErpInstaller
                 Text = "View Installation Log", Size = new Size(168, 34),
                 Location = new Point(200, 198), Visible = false
             };
-            _btnViewLog.Click += (s, e) => GoToPage(3);
+            _btnViewLog.Click += (s, e) =>
+            {
+                var logForm = new Form
+                {
+                    Text = "Installation Log — SA-US ERP",
+                    Size = new Size(620, 460),
+                    StartPosition = FormStartPosition.CenterParent,
+                    Font = new Font("Segoe UI", 9.5f),
+                    MinimizeBox = false
+                };
+                var rtb = new RichTextBox
+                {
+                    Dock = DockStyle.Fill,
+                    ReadOnly = true,
+                    BackColor = Color.FromArgb(28, 28, 28),
+                    ForeColor = Color.FromArgb(212, 212, 212),
+                    Font = new Font("Consolas", 8.5f),
+                    Text = _rtbLog.Text,
+                    ScrollBars = RichTextBoxScrollBars.Vertical
+                };
+                logForm.Controls.Add(rtb);
+                logForm.ShowDialog(this);
+            };
 
             p.Controls.AddRange(new Control[] { _lblDoneTitle, _lblDoneDetail, _btnOpenFolder, _btnViewLog });
             return p;
