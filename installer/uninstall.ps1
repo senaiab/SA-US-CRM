@@ -81,6 +81,16 @@ try {
         }
     }
 
+    # Stop and remove bundled MariaDB service if present
+    $bundledSvc = Get-Service -Name "SA-US-ERP-MariaDB" -ErrorAction SilentlyContinue
+    if ($bundledSvc) {
+        if ($bundledSvc.Status -eq "Running") {
+            Stop-Service -Name "SA-US-ERP-MariaDB" -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 2
+        }
+        & sc.exe delete "SA-US-ERP-MariaDB" 2>$null | Out-Null
+    }
+
     if (Test-Path -LiteralPath $InstallDir) {
         $cleanupScript = @"
 Start-Sleep -Seconds 3

@@ -132,6 +132,16 @@ function Find-MySql {
     $fromPath = Get-Command mysql.exe -ErrorAction SilentlyContinue
     if ($fromPath) { return $fromPath.Source }
 
+    # Check bundled MariaDB (registered install location in HKCU)
+    try {
+        $regLoc = (Get-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\SA-US ERP" `
+            -ErrorAction SilentlyContinue).InstallLocation
+        if ($regLoc) {
+            $bundled = Join-Path $regLoc "mariadb\bin\mysql.exe"
+            if (Test-Path -LiteralPath $bundled) { return $bundled }
+        }
+    } catch {}
+
     # Common MariaDB / MySQL installation locations
     $patterns = @(
         "$env:ProgramFiles\MariaDB*\bin\mysql.exe",
@@ -145,6 +155,94 @@ function Find-MySql {
         if ($found) { return $found.FullName }
     }
     return $null
+}
+
+function Install-BundledMariaDB {
+    param(
+        [Parameter(Mandatory=$true)][string]$InstallDir,
+        [Parameter(Mandatory=$true)][string]$MariaDbSource
+    )
+
+    # Skip if any DB service already present
+    if (Test-DatabaseServiceInstalled) {
+        Write-Host "Existing database service detected - skipping bundled MariaDB install."
+        return $false
+    }
+
+    # Verify bundled files are present
+    if (!(Test-Path -LiteralPath (Join-Path $MariaDbSource "bin\mysqld.exe"))) {
+        Write-Host "Bundled MariaDB not found in payload." -ForegroundColor Yellow
+        return $false
+    }
+
+    $svcName  = "SA-US-ERP-MariaDB"
+    $mariaDir = Join-Path $InstallDir "mariadb"
+    $binDir   = Join-Path $mariaDir "bin"
+    $mysqld   = Join-Path $binDir "mysqld.exe"
+
+    # DB data and config go to ProgramData (no spaces in path - required by mysqld --defaults-file)
+    $mariaData = "C:\ProgramData\SA-US-ERP-DB"
+    $dataDir   = Join-Path $mariaData "data"
+    $myIni     = Join-Path $mariaData "my.ini"
+
+    Write-Host "Installing bundled MariaDB to $mariaDir ..."
+
+    # Copy binaries (never overwrite existing data directory)
+    Get-ChildItem -LiteralPath $MariaDbSource -Recurse -Force | ForEach-Object {
+        $rel = $_.FullName.Substring($MariaDbSource.Length).TrimStart('\')
+        $dst = Join-Path $mariaDir $rel
+        if ($_.PSIsContainer) {
+            New-Item -ItemType Directory -Force -Path $dst | Out-Null
+        } elseif ($rel -notmatch '^data\\') {
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent $dst) | Out-Null
+            Copy-Item -LiteralPath $_.FullName -Destination $dst -Force
+        }
+    }
+
+    # Create data root dir and write my.ini (no spaces in path)
+    New-Item -ItemType Directory -Force -Path $mariaData | Out-Null
+
+    @"
+[mysqld]
+datadir=$dataDir
+port=3306
+innodb_buffer_pool_size=64M
+max_connections=25
+
+[client]
+port=3306
+"@ | Set-Content -Path $myIni -Encoding ASCII
+
+    # Initialize data directory if not already done
+    if (!(Test-Path -LiteralPath (Join-Path $dataDir "mysql"))) {
+        Write-Host "Initializing MariaDB data directory (this may take a moment)..."
+        $errFile = "$env:TEMP\sa_maria_init.txt"
+        $proc = Start-Process -FilePath $mysqld -Wait -PassThru -NoNewWindow `
+            -ArgumentList "--initialize-insecure", "--datadir=$dataDir" `
+            -RedirectStandardError $errFile
+        if ($proc.ExitCode -ne 0) {
+            $err = (Get-Content $errFile -Raw -ErrorAction SilentlyContinue).Trim()
+            throw "MariaDB data directory init failed (exit $($proc.ExitCode)): $err"
+        }
+    }
+
+    # Register Windows service (requires admin)
+    Write-Host "Registering Windows service '$svcName'..."
+    $proc2 = Start-Process -FilePath $mysqld -Wait -PassThru -NoNewWindow `
+        -ArgumentList "--install", $svcName, "--defaults-file=$myIni"
+    if ($proc2.ExitCode -ne 0) {
+        throw "MariaDB service registration failed (exit $($proc2.ExitCode)). Run the installer as Administrator."
+    }
+
+    & sc.exe config $svcName start= auto 2>$null | Out-Null
+
+    # Start service
+    Write-Host "Starting MariaDB service..."
+    Start-Service -Name $svcName -ErrorAction Stop
+    Start-Sleep -Seconds 4
+
+    Write-Host "MariaDB installed and running as service '$svcName'." -ForegroundColor Green
+    return $true
 }
 
 function Offer-DatabasePrerequisite {
@@ -722,21 +820,23 @@ start "" "%InstallDir%"
     New-ItemProperty -Path $uninstallKey -Name "NoRepair" -Value 1 -PropertyType DWord -Force | Out-Null
 
     if ($InstallMode -eq "server" -or $InstallMode -eq "both") {
-        # 1. Track whether MariaDB already existed before install
+        # 1. Track whether a DB service existed before this install
         $dbWasAbsent = !(Test-DatabaseServiceInstalled)
 
-        # 2. Install MariaDB if not already present
-        if (!$SkipShortcuts) {
+        # 2. Try bundled MariaDB first; fall back to offering a download
+        $mariaSource     = Join-Path $payloadRoot "mariadb"
+        $installedBundle = Install-BundledMariaDB -InstallDir $InstallDir -MariaDbSource $mariaSource
+        if (!$installedBundle -and $dbWasAbsent -and !$SkipShortcuts) {
             Offer-DatabasePrerequisite -InstallDir $InstallDir
         }
 
-        # 3. Set root password if this was a fresh MariaDB install
+        # 3. Set root password if a fresh DB was just installed
         $presetRootPw = ""
         if ($dbWasAbsent -and (Test-DatabaseServiceInstalled)) {
             $presetRootPw = Set-MariaDbRootPassword -InstallDir $InstallDir
         }
 
-        # 4. Create the database and app user
+        # 4. Create the SA-US ERP database and app user
         Initialize-Database -InstallDir $InstallDir -PresetRootPassword $presetRootPw
     }
 

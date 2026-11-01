@@ -106,6 +106,24 @@ jobs:
             }
           }
 
+          # Download and bundle MariaDB (no-install, Windows x64)
+          $mariaVersion = "11.4.4"
+          $mariaUrl  = "https://archive.mariadb.org/mariadb-$mariaVersion/winx64-packages/mariadb-$mariaVersion-winx64.zip"
+          $mariaZip  = "$root\mariadb.zip"
+          $mariaTmp  = "$root\mariadb-tmp"
+          Write-Host "Downloading MariaDB $mariaVersion..."
+          Invoke-WebRequest -Uri $mariaUrl -OutFile $mariaZip -UseBasicParsing
+          Write-Host "Extracting MariaDB..."
+          Expand-Archive -Path $mariaZip -DestinationPath $mariaTmp -Force
+          $mariaInner = Get-ChildItem $mariaTmp -Directory | Select-Object -First 1
+          $mariaPayload = "$payload\mariadb"
+          New-Item -ItemType Directory -Force -Path $mariaPayload | Out-Null
+          Copy-Item -Recurse "$($mariaInner.FullName)\*" "$mariaPayload\" -Force
+          Remove-Item $mariaZip -Force
+          Remove-Item $mariaTmp -Recurse -Force
+          $mariaMB = [math]::Round((Get-ChildItem $mariaPayload -Recurse | Measure-Object -Property Length -Sum).Sum / 1MB)
+          Write-Host "MariaDB $mariaVersion bundled ($mariaMB MB)."
+
           $zipPath = "$srcDir\payload.zip"
           Compress-Archive -Path $payload -DestinationPath $zipPath -CompressionLevel Optimal
 
