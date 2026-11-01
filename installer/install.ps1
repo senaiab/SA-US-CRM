@@ -199,8 +199,9 @@ function Install-BundledMariaDB {
         }
     }
 
-    # Create data root dir and write my.ini (no spaces in path)
+    # Create data root and data subdir, then write my.ini (no spaces in path)
     New-Item -ItemType Directory -Force -Path $mariaData | Out-Null
+    New-Item -ItemType Directory -Force -Path $dataDir   | Out-Null
 
     @"
 [mysqld]
