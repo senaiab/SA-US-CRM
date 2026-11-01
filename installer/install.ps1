@@ -217,22 +217,41 @@ port=3306
     # Initialize data directory if not already done
     if (!(Test-Path -LiteralPath (Join-Path $dataDir "mysql"))) {
         Write-Host "Initializing MariaDB data directory (this may take a moment)..."
-        $errFile = "$env:TEMP\sa_maria_init.txt"
-        $proc = Start-Process -FilePath $mysqld -Wait -PassThru -NoNewWindow `
-            -ArgumentList "--initialize-insecure", "--datadir=$dataDir" `
-            -RedirectStandardError $errFile
-        if ($proc.ExitCode -ne 0) {
-            $err = (Get-Content $errFile -Raw -ErrorAction SilentlyContinue).Trim()
-            throw "MariaDB data directory init failed (exit $($proc.ExitCode)): $err"
+        $psi = New-Object System.Diagnostics.ProcessStartInfo
+        $psi.FileName        = $mysqld
+        $psi.Arguments       = "--initialize-insecure --datadir=`"$dataDir`""
+        $psi.UseShellExecute = $false
+        $psi.CreateNoWindow  = $true
+        $psi.RedirectStandardError  = $true
+        $psi.RedirectStandardOutput = $true
+        $initProc = [System.Diagnostics.Process]::Start($psi)
+        $initErr  = $initProc.StandardError.ReadToEnd()
+        $initProc.WaitForExit()
+        if ($initProc.ExitCode -ne 0) {
+            throw "MariaDB data directory init failed (exit $($initProc.ExitCode)): $($initErr.Trim())"
         }
     }
 
-    # Register Windows service (requires admin)
+    # Register Windows service (requires admin — installer must be run as Administrator)
+    $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
+                 [Security.Principal.WindowsBuiltInRole]::Administrator)
+    if (!$isAdmin) {
+        throw "MariaDB service registration requires Administrator rights. Please right-click the installer and choose 'Run as administrator'."
+    }
+
     Write-Host "Registering Windows service '$svcName'..."
-    $proc2 = Start-Process -FilePath $mysqld -Wait -PassThru -NoNewWindow `
-        -ArgumentList "--install", $svcName, "--defaults-file=$myIni"
-    if ($proc2.ExitCode -ne 0) {
-        throw "MariaDB service registration failed (exit $($proc2.ExitCode)). Run the installer as Administrator."
+    $psi2 = New-Object System.Diagnostics.ProcessStartInfo
+    $psi2.FileName        = $mysqld
+    $psi2.Arguments       = "--install `"$svcName`" --defaults-file=`"$myIni`""
+    $psi2.UseShellExecute = $false
+    $psi2.CreateNoWindow  = $true
+    $psi2.RedirectStandardError  = $true
+    $psi2.RedirectStandardOutput = $true
+    $svcProc = [System.Diagnostics.Process]::Start($psi2)
+    $svcErr  = $svcProc.StandardError.ReadToEnd()
+    $svcProc.WaitForExit()
+    if ($svcProc.ExitCode -ne 0) {
+        throw "MariaDB service registration failed (exit $($svcProc.ExitCode)): $($svcErr.Trim())"
     }
 
     & sc.exe config $svcName start= auto 2>$null | Out-Null
@@ -812,7 +831,7 @@ start "" "%InstallDir%"
     $uninstallKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\SA-US ERP"
     New-Item -Path $uninstallKey -Force | Out-Null
     New-ItemProperty -Path $uninstallKey -Name "DisplayName" -Value "SA-US ERP" -PropertyType String -Force | Out-Null
-    New-ItemProperty -Path $uninstallKey -Name "DisplayVersion" -Value "2.6.0" -PropertyType String -Force | Out-Null
+    New-ItemProperty -Path $uninstallKey -Name "DisplayVersion" -Value "2.6.1" -PropertyType String -Force | Out-Null
     New-ItemProperty -Path $uninstallKey -Name "Publisher" -Value "SA Ultimate Solutions" -PropertyType String -Force | Out-Null
     New-ItemProperty -Path $uninstallKey -Name "InstallLocation" -Value $InstallDir -PropertyType String -Force | Out-Null
     New-ItemProperty -Path $uninstallKey -Name "UninstallString" -Value "`"$InstallDir\uninstall.cmd`"" -PropertyType String -Force | Out-Null
