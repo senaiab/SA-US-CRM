@@ -43,7 +43,7 @@ namespace SaUsErpInstaller
 
         // Page 4 — Done
         private Label _lblDoneTitle, _lblDoneDetail;
-        private Button _btnOpenFolder;
+        private Button _btnOpenFolder, _btnViewLog;
 
         private bool _installSuccess;
         private string _installDir;
@@ -243,7 +243,14 @@ namespace SaUsErpInstaller
                     Process.Start("explorer.exe", _installDir);
             };
 
-            p.Controls.AddRange(new Control[] { _lblDoneTitle, _lblDoneDetail, _btnOpenFolder });
+            _btnViewLog = new Button
+            {
+                Text = "View Installation Log", Size = new Size(168, 34),
+                Location = new Point(200, 198), Visible = false
+            };
+            _btnViewLog.Click += (s, e) => GoToPage(3);
+
+            p.Controls.AddRange(new Control[] { _lblDoneTitle, _lblDoneDetail, _btnOpenFolder, _btnViewLog });
             return p;
         }
 
@@ -416,6 +423,7 @@ namespace SaUsErpInstaller
                     "Review the log on the previous step for error details.\n\n" +
                     "You may run the installer again or contact SA Ultimate Solutions for support.";
                 _btnOpenFolder.Enabled = false;
+                _btnViewLog.Visible    = true;
             }
 
             GoToPage(4);
