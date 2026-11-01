@@ -27,6 +27,7 @@ namespace SaUsErpInstaller
     class WizardForm : Form
     {
         private Panel[] _pages;
+        private Panel _content;
         private int _currentPage;
 
         private Button _btnBack, _btnNext, _btnCancel;
@@ -83,15 +84,16 @@ namespace SaUsErpInstaller
             Controls.Add(header);
 
             // Content area — must be added BEFORE bottom bar so Fill gets remaining space
-            var content = new Panel { Dock = DockStyle.Fill };
+            // Pages are swapped in/out one at a time to avoid multi-Fill clipping bugs
+            _content = new Panel { Dock = DockStyle.Fill };
             _pages = new Panel[5];
             _pages[0] = BuildPage0_Welcome();
             _pages[1] = BuildPage1_Mode();
             _pages[2] = BuildPage2_Directory();
             _pages[3] = BuildPage3_Progress();
             _pages[4] = BuildPage4_Done();
-            foreach (var p in _pages) { p.Dock = DockStyle.Fill; p.Visible = false; content.Controls.Add(p); }
-            Controls.Add(content);
+            foreach (var p in _pages) p.Dock = DockStyle.Fill;
+            Controls.Add(_content);
 
             // Button bar — added after Fill so it docks to bottom correctly
             var bar = new Panel { Dock = DockStyle.Bottom, Height = 52, BackColor = Color.FromArgb(242, 242, 242) };
@@ -281,8 +283,8 @@ namespace SaUsErpInstaller
         private void GoToPage(int page)
         {
             _currentPage = page;
-            foreach (var pg in _pages) pg.Visible = false;
-            _pages[page].Visible = true;
+            _content.Controls.Clear();
+            _content.Controls.Add(_pages[page]);
 
             _btnBack.Enabled   = page > 0 && page < 3;
             _btnCancel.Visible = page < 4;
