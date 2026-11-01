@@ -94,8 +94,17 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Ro
 
 /* ── Tabs ── */
 .tab-bar{display:flex;background:#fff;border-bottom:2px solid var(--border)}
+.tab-bar.scroll{overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch}
+.tab-bar.scroll .tab{display:inline-flex;align-items:center;justify-content:center;flex:none;min-width:72px}
 .tab{flex:1;padding:12px 8px;text-align:center;font-size:13px;font-weight:600;color:var(--gray);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:color .15s,border-color .15s}
 .tab.active{color:var(--blue);border-color:var(--blue)}
+
+/* ── Warning / info banners ── */
+.warn-banner{display:flex;align-items:flex-start;gap:8px;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:12px;line-height:1.4}
+.warn-banner.pci{background:#fff3e0;border-left:3px solid var(--accent);color:#6d4200}
+.warn-banner.info{background:#e8f5e9;border-left:3px solid var(--green);color:#1b5e20}
+.warn-banner.anon{background:#f3e5f5;border-left:3px solid #6a1b9a;color:#4a148c}
+.warn-banner.danger{background:#ffebee;border-left:3px solid var(--red);color:#b71c1c}
 
 /* ── Login ── */
 #screen-login{background:linear-gradient(135deg,var(--blue-dark) 0%,var(--blue) 100%);min-height:100%;display:flex;align-items:center;justify-content:center;padding:24px}
@@ -119,21 +128,28 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Ro
 .badge-red{background:#ffebee;color:var(--red)}
 .badge-blue{background:var(--blue-light);color:var(--blue)}
 .badge-gray{background:#eceff1;color:var(--gray)}
+.badge-orange{background:#fff3e0;color:#e65100}
+.badge-purple{background:#f3e5f5;color:#6a1b9a}
 
 /* ── Toast ── */
 #toast{position:fixed;bottom:calc(var(--nav-h) + 8px);left:50%;transform:translateX(-50%) translateY(20px);background:#323232;color:#fff;padding:10px 20px;border-radius:24px;font-size:14px;opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;z-index:500;white-space:nowrap;max-width:90vw;text-align:center}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
-/* ── User table ── */
+/* ── Data table ── */
 .data-table{width:100%;border-collapse:collapse;font-size:13px}
 .data-table th{background:#f5f5f5;padding:10px 12px;text-align:left;font-weight:600;color:var(--gray);font-size:12px;white-space:nowrap}
 .data-table td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:top}
 .data-table tr:last-child td{border-bottom:none}
+.data-table tr.clickable:hover{background:#f9f9f9;cursor:pointer}
 .table-wrap{overflow-x:auto}
 
 /* ── Divider ── */
 .divider{height:1px;background:var(--border);margin:14px 0}
 .section-label{font-size:12px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;padding:16px 14px 6px}
+
+/* ── Inline compliance form ── */
+.comp-form{background:#f9fafe;border:1.5px solid var(--blue-light);border-radius:10px;padding:14px;margin:10px 14px}
+.comp-form-header{font-weight:700;font-size:14px;color:var(--blue);margin-bottom:12px}
 
 /* ── Responsive ── */
 @media(min-width:600px){
@@ -200,22 +216,42 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Ro
 
       <!-- Admin -->
       <div id="tab-admin" class="screen">
-        <div class="tab-bar">
+        <div class="tab-bar scroll">
           <div class="tab active" data-atab="users" onclick="adminTab('users')">Users</div>
-          <div class="tab" data-atab="audit" onclick="adminTab('audit')">Audit Log</div>
+          <div class="tab" data-atab="audit" onclick="adminTab('audit')">Audit</div>
+          <div class="tab" data-atab="compliance" id="admin-tab-compliance" onclick="adminTab('compliance')">&#128274; Compliance</div>
           <div class="tab" data-atab="newuser" onclick="adminTab('newuser')">+ User</div>
         </div>
         <div id="admin-users-pane"><div class="loading"><div class="spinner"></div></div></div>
         <div id="admin-audit-pane" style="display:none"><div class="loading"><div class="spinner"></div></div></div>
+
+        <!-- Compliance pane -->
+        <div id="admin-compliance-pane" style="display:none">
+          <div class="tab-bar scroll" style="border-top:1px solid var(--border)">
+            <div class="tab active" data-ctab="privdash" onclick="compTab('privdash')">Dashboard</div>
+            <div class="tab" data-ctab="dsr" onclick="compTab('dsr')">DSR</div>
+            <div class="tab" data-ctab="breach" onclick="compTab('breach')">Breaches</div>
+            <div class="tab" data-ctab="consent" onclick="compTab('consent')">Consent</div>
+            <div class="tab" data-ctab="processors" onclick="compTab('processors')">Processors</div>
+            <div class="tab" data-ctab="retention" onclick="compTab('retention')">Retention</div>
+            <div class="tab" data-ctab="training" onclick="compTab('training')">Training</div>
+          </div>
+          <div id="comp-privdash"><div class="loading"><div class="spinner"></div></div></div>
+          <div id="comp-dsr" style="display:none"></div>
+          <div id="comp-breach" style="display:none"></div>
+          <div id="comp-consent" style="display:none"></div>
+          <div id="comp-processors" style="display:none"></div>
+          <div id="comp-retention" style="display:none"></div>
+          <div id="comp-training" style="display:none"></div>
+        </div>
+
         <div id="admin-newuser-pane" style="display:none">
           <div class="form-wrap">
             <div class="form-group"><label>Username</label><input id="nu-user" type="text"></div>
             <div class="form-group"><label>Full Name</label><input id="nu-name" type="text"></div>
+            <div class="form-group"><label>Email (optional)</label><input id="nu-email" type="email"></div>
             <div class="form-group"><label>Role</label>
-              <select id="nu-role">
-                <option>Owner</option><option>Business Manager</option><option selected>Sales Agent</option>
-                <option>Ticketing Officer</option><option>Finance Officer</option><option>Viewer</option>
-              </select>
+              <select id="nu-role"></select>
             </div>
             <div class="form-group"><label>Password</label><input id="nu-pass" type="password"></div>
             <button class="btn btn-primary" onclick="saveNewUser()">Save User</button>
@@ -274,6 +310,15 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Ro
 <script>
 'use strict';
 
+// ── Role sets ──────────────────────────────────────────────────────────────
+const ADMIN_ROLES      = new Set(['Owner','Business Manager','Super Admin','Manager']);
+const COMPLIANCE_ROLES = new Set(['Owner','Business Manager','Super Admin','Manager','DPO/Privacy Officer']);
+const DPO_ROLES        = new Set(['Owner','Super Admin','DPO/Privacy Officer']);
+const AUDIT_READ_ROLES = new Set([...ADMIN_ROLES,'Auditor','DPO/Privacy Officer']);
+const WRITE_ROLES      = new Set(['Owner','Business Manager','Super Admin','Manager',
+  'Finance User','Sales/Booking User','Customer Service User',
+  'Sales Agent','Ticketing Officer','Finance Officer']);
+
 // ── State ──────────────────────────────────────────────────────────────────
 const S = {
   token: localStorage.getItem('sa_token') || '',
@@ -282,9 +327,13 @@ const S = {
   currentNav: 'dashboard',
   currentModule: null,
   moduleFields: {},
+  allRoles: [],
   records: [],
   editRecord: null,
   dashData: null,
+  compSubTab: 'privdash',
+  compEditId: null,
+  compShowForm: {},
 };
 
 // ── API ────────────────────────────────────────────────────────────────────
@@ -316,6 +365,7 @@ const API = {
   create(data)     { return this.req('POST','/records',data); },
   update(id,data)  { return this.req('PUT',`/records/${id}`,data); },
   del(id)          { return this.req('DELETE',`/records/${id}`); },
+  anonymize(id,reason){ return this.req('POST',`/records/${id}/anonymize`,{reason}); },
   users()          { return this.req('GET','/admin/users'); },
   audit(mod,usr)   { let p='/admin/audit?limit=100';if(mod)p+=`&module=${mod}`;if(usr)p+=`&username=${usr}`;return this.req('GET',p); },
   deactivate(u)    { return this.req('POST',`/admin/users/${u}/deactivate`); },
@@ -324,6 +374,25 @@ const API = {
   resetPassword(u,np) { return this.req('POST','/admin/user',{username:u,new_password:np}); },
   chgPwd(cur,nw)   { return this.req('PUT','/users/me/password',{current_password:cur,new_password:nw}); },
   search(q)        { return this.req('GET',`/search?q=${encodeURIComponent(q)}`); },
+  // Compliance endpoints
+  compDash()                { return this.req('GET','/compliance/dashboard'); },
+  compDsr(lim=200)          { return this.req('GET',`/compliance/dsr?limit=${lim}`); },
+  compDsrCreate(d)          { return this.req('POST','/compliance/dsr',d); },
+  compDsrUpdate(id,d)       { return this.req('PUT',`/compliance/dsr/${id}`,d); },
+  compBreach(lim=200)       { return this.req('GET',`/compliance/breach?limit=${lim}`); },
+  compBreachCreate(d)       { return this.req('POST','/compliance/breach',d); },
+  compBreachUpdate(id,d)    { return this.req('PUT',`/compliance/breach/${id}`,d); },
+  compConsent(lim=200)      { return this.req('GET',`/compliance/consent?limit=${lim}`); },
+  compConsentCreate(d)      { return this.req('POST','/compliance/consent',d); },
+  compConsentUpdate(id,d)   { return this.req('PUT',`/compliance/consent/${id}`,d); },
+  compProcessors(lim=200)   { return this.req('GET',`/compliance/processors?limit=${lim}`); },
+  compProcessorsCreate(d)   { return this.req('POST','/compliance/processors',d); },
+  compProcessorsUpdate(id,d){ return this.req('PUT',`/compliance/processors/${id}`,d); },
+  compRetention(lim=200)    { return this.req('GET',`/compliance/retention?limit=${lim}`); },
+  compRetentionCreate(d)    { return this.req('POST','/compliance/retention',d); },
+  compRetentionUpdate(id,d) { return this.req('PUT',`/compliance/retention/${id}`,d); },
+  compTraining(lim=200)     { return this.req('GET',`/compliance/training?limit=${lim}`); },
+  compTrainingCreate(d)     { return this.req('POST','/compliance/training',d); },
 };
 
 // ── Toast ──────────────────────────────────────────────────────────────────
@@ -389,7 +458,13 @@ function navTo(name) {
 
   if (name==='dashboard') loadDashboard();
   else if (name==='modules') loadModules();
-  else if (name==='admin') { loadAdminUsers(); adminTab('users'); }
+  else if (name==='admin') {
+    // Show compliance tab only for COMPLIANCE_ROLES or AUDIT_READ_ROLES
+    const showComp = COMPLIANCE_ROLES.has(S.role) || AUDIT_READ_ROLES.has(S.role);
+    document.getElementById('admin-tab-compliance').style.display = showComp ? '' : 'none';
+    if (AUDIT_READ_ROLES.has(S.role)) { loadAdminUsers(); adminTab('users'); }
+    else adminTab('users');
+  }
   else if (name==='profile') {
     document.getElementById('prof-name').textContent = S.fullName;
     document.getElementById('prof-role').textContent = S.role;
@@ -456,7 +531,6 @@ function renderDashboard(d, r={}) {
     </div>
   </div>`;
 
-  // Module counts
   if (d.counts && Object.keys(d.counts).length) {
     h += '<div class="section-label">Modules</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 14px 4px">';
     for (const [mod, cnt] of Object.entries(d.counts)) {
@@ -469,7 +543,6 @@ function renderDashboard(d, r={}) {
     h += '</div>';
   }
 
-  // Reminders
   if (ol.length || ul.length || oa.length) {
     h += '<div class="card"><div class="card-header">Reminders</div>';
     if (ol.length) {
@@ -500,6 +573,10 @@ async function loadModules() {
   try {
     const d = await API.modules();
     S.moduleFields = d.modules;
+    if (d.all_roles && d.all_roles.length) {
+      S.allRoles = d.all_roles;
+      populateRoleDropdown();
+    }
     let h = '';
     for (const mod of Object.keys(d.modules)) {
       const cnt = (S.dashData?.counts||{})[mod] ?? '';
@@ -511,6 +588,15 @@ async function loadModules() {
     }
     g.innerHTML = h;
   } catch(e){ g.innerHTML=`<div class="empty" style="grid-column:1/-1"><p>${e.message}</p></div>`; }
+}
+
+function populateRoleDropdown() {
+  const sel = document.getElementById('nu-role');
+  if (!sel || !S.allRoles.length) return;
+  const cur = sel.value;
+  sel.innerHTML = S.allRoles.map(r=>`<option${r===cur?' selected':''}>${esc(r)}</option>`).join('');
+  // Default to a non-admin role
+  if (!cur) sel.value = S.allRoles.includes('Sales/Booking User') ? 'Sales/Booking User' : S.allRoles[0];
 }
 
 // ── Records ────────────────────────────────────────────────────────────────
@@ -534,9 +620,10 @@ function renderRecordList(records) {
     const title = r.title || r.code || '—';
     const sub = subField ? (r.data[subField]||'') : (r.updated_at?r.updated_at.slice(0,10):'');
     const avatar = title.trim()[0]?.toUpperCase()||'?';
+    const anonBadge = r.is_anonymized ? ' <span class="badge badge-purple">Anon</span>' : '';
     h += `<div class="list-item" onclick="openForm(${JSON.stringify(r).replace(/"/g,'&quot;')})">
       <div class="item-avatar">${avatar}</div>
-      <div class="item-body"><div class="item-title">${esc(title)}</div>${sub?`<div class="item-sub">${esc(String(sub))}</div>`:''}</div>
+      <div class="item-body"><div class="item-title">${esc(title)}${anonBadge}</div>${sub?`<div class="item-sub">${esc(String(sub))}</div>`:''}</div>
       <div class="item-arrow">›</div>
     </div>`;
   });
@@ -547,6 +634,8 @@ function renderRecordList(records) {
 // ── Record Form ────────────────────────────────────────────────────────────
 const DATE_FIELDS = /Date|date/;
 const BOOL_FIELDS = /\?$/;
+const SENSITIVE_FIELDS = new Set(['Passport Number','Date of Birth']);
+
 const SELECT_FIELDS = {
   'Lead Status':['New','Contacted','Proposal','Negotiation','Closed-Won','Closed-Lost','Dormant'],
   'Priority':['Low','Medium','High','Urgent'],
@@ -555,26 +644,41 @@ const SELECT_FIELDS = {
   'AR Stage':['Invoiced','Reminded','Escalated','Legal','Written Off'],
   'Severity':['Low','Medium','High','Critical'],
   'Status':['Open','In Progress','Resolved','Closed'],
-  'Currency':['USD','PHP','SGD','AUD','EUR','GBP'],
+  'Currency':['USD','PHP','SGD','AUD','EUR','GBP','ETB'],
+  'Lawful Basis':['Consent','Contract','Legal Obligation','Vital Interests','Public Task','Legitimate Interests'],
+  'Refusal to Provide Contact?':[''],
+  'Consent to Contact?':[''],
 };
 
 function renderForm() {
   const fields = S.moduleFields[S.currentModule] || [];
   const data = S.editRecord?.data || {};
   const isEdit = !!S.editRecord;
-  const canWrite = S.role === 'Owner' || S.role === 'Business Manager' || S.role === 'Sales Agent' || S.role === 'Ticketing Officer' || S.role === 'Finance Officer';
+  const canWrite = WRITE_ROLES.has(S.role);
+  const isDPO = DPO_ROLES.has(S.role);
 
   let h = '';
-  // Group fields into rows of 2 for short fields, full width for long ones
-  const longFields = ['Notes','Remarks','Comments','Corrective Action','Root Cause','Resolution','Performance Notes','Billing Address'];
+
+  // PCI-DSS warning banner for financial/personal data modules
+  if (['bookings','clients','ar','quotations'].includes(S.currentModule)) {
+    h += `<div class="warn-banner pci">&#9888;&#65039; <div><strong>PCI-DSS Policy:</strong> Do not enter card numbers, CVV/CVC codes, or payment card data in any field. Card data is automatically detected and blocked.</div></div>`;
+  }
+
+  // Anonymized record notice
+  if (S.editRecord?.is_anonymized) {
+    h += `<div class="warn-banner anon">&#128274; <div><strong>Anonymized Record:</strong> Personal data fields have been irreversibly removed from this record in response to a data subject request.</div></div>`;
+  }
+
+  const longFields = ['Notes','Remarks','Comments','Corrective Action','Root Cause','Resolution','Performance Notes','Billing Address','Scope','Description'];
 
   for (let i=0; i<fields.length;) {
     const f = fields[i];
     const isLong = longFields.some(l=>f.includes(l));
+
     if (isLong) {
       h += `<div class="form-group"><label>${esc(f)}</label><textarea id="ff_${i}" ${!canWrite?'readonly':''}>${esc(data[f]||'')}</textarea></div>`;
       i++;
-    } else if (SELECT_FIELDS[f]) {
+    } else if (SELECT_FIELDS[f] && SELECT_FIELDS[f].length > 1) {
       const cur = data[f]||'';
       h += `<div class="form-group"><label>${esc(f)}</label><select id="ff_${i}" ${!canWrite?'disabled':''}>`;
       h += `<option value=""></option>`;
@@ -585,11 +689,18 @@ function renderForm() {
       const cur = data[f]||'';
       h += `<div class="form-group"><label>${esc(f)}</label><select id="ff_${i}" ${!canWrite?'disabled':''}><option value=""></option><option${cur==='Yes'?' selected':''}>Yes</option><option${cur==='No'?' selected':''}>No</option></select></div>`;
       i++;
+    } else if (SENSITIVE_FIELDS.has(f) && !isDPO) {
+      // Masked display for non-DPO: show readonly, preserve original on save
+      const val = data[f] || '';
+      h += `<div class="form-group"><label>${esc(f)}</label>
+        <input id="ff_${i}" type="text" value="${esc(String(val))}" readonly style="background:#f5f5f5;color:var(--gray)">
+        <small style="color:var(--gray);font-size:11px;display:block;margin-top:3px">&#128274; Sensitive field — contact DPO/Privacy Officer to update.</small>
+      </div>`;
+      i++;
     } else {
-      // Pair with next non-long field if available
       const f2 = fields[i+1];
       const isLong2 = f2 && longFields.some(l=>f2.includes(l));
-      if (f2 && !isLong2 && !SELECT_FIELDS[f2] && !BOOL_FIELDS.test(f2)) {
+      if (f2 && !isLong2 && !SELECT_FIELDS[f2] && !BOOL_FIELDS.test(f2) && !SENSITIVE_FIELDS.has(f2)) {
         h += `<div class="form-row">`;
         h += fieldInput(f, i, data, canWrite);
         h += fieldInput(f2, i+1, data, canWrite);
@@ -609,6 +720,14 @@ function renderForm() {
     </div>`;
   }
 
+  // DPO anonymize section
+  if (isEdit && isDPO && !S.editRecord.is_anonymized) {
+    h += `<div class="divider"></div>
+      <div class="warn-banner danger" style="margin:0 0 10px">&#128274; <div><strong>DPO Actions:</strong> Anonymization permanently removes PII fields. This cannot be undone.</div></div>
+      <div class="form-group"><label>Anonymization Reason</label><input id="anon-reason" type="text" placeholder="e.g. DSR Erasure Request #DSR-001"></div>
+      <button class="btn btn-danger" onclick="anonymizeRecord()">&#128274; Anonymize This Record</button>`;
+  }
+
   document.getElementById('form-content').innerHTML = h;
   document.getElementById('form-content').scrollTop = 0;
 }
@@ -621,10 +740,15 @@ function fieldInput(f, idx, data, canWrite) {
 
 async function saveRecord() {
   const fields = S.moduleFields[S.currentModule] || [];
-  const formData = {};
+  const isDPO = DPO_ROLES.has(S.role);
+  // Start from existing data to preserve fields not in form (e.g. server-side fields)
+  const formData = S.editRecord ? {...(S.editRecord.data || {})} : {};
   fields.forEach((f,i)=>{
     const el = document.getElementById('ff_'+i);
-    if (el) formData[f] = el.value;
+    if (!el) return;
+    // Don't overwrite sensitive fields if user is not DPO (input is readonly)
+    if (SENSITIVE_FIELDS.has(f) && !isDPO) return;
+    formData[f] = el.value;
   });
   const codeField = fields[0] || 'code';
   const code = formData[codeField] || '';
@@ -654,38 +778,60 @@ async function deleteRecord() {
   } catch(e){ toast('Error: '+e.message, 4000); }
 }
 
+async function anonymizeRecord() {
+  if (!S.editRecord?.id) return;
+  const reason = document.getElementById('anon-reason')?.value?.trim() || '';
+  if (!reason) { toast('Enter a reason before anonymizing.'); return; }
+  if (!confirm('WARNING: Permanently remove PII fields from this record? This cannot be undone.')) return;
+  try {
+    await API.anonymize(S.editRecord.id, reason);
+    toast('Record anonymized.');
+    openModule(S.currentModule);
+  } catch(e){ toast('Error: '+e.message, 4000); }
+}
+
 // ── Admin ──────────────────────────────────────────────────────────────────
 function adminTab(name) {
-  document.querySelectorAll('#tab-admin .tab').forEach(t=>t.classList.toggle('active', t.dataset.atab===name));
-  document.getElementById('admin-users-pane').style.display = name==='users'?'':'none';
-  document.getElementById('admin-audit-pane').style.display = name==='audit'?'':'none';
-  document.getElementById('admin-newuser-pane').style.display = name==='newuser'?'':'none';
+  document.querySelectorAll('#tab-admin > .tab-bar:first-child .tab').forEach(t=>t.classList.toggle('active', t.dataset.atab===name));
+  document.getElementById('admin-users-pane').style.display      = name==='users'?'':'none';
+  document.getElementById('admin-audit-pane').style.display      = name==='audit'?'':'none';
+  document.getElementById('admin-compliance-pane').style.display = name==='compliance'?'':'none';
+  document.getElementById('admin-newuser-pane').style.display    = name==='newuser'?'':'none';
   if (name==='audit') loadAudit();
+  if (name==='compliance') { S.compSubTab='privdash'; compTab('privdash'); }
+  if (name==='newuser') { if (S.allRoles.length) populateRoleDropdown(); }
 }
 
 async function loadAdminUsers() {
-  if (S.role!=='Owner'&&S.role!=='Business Manager') {
+  if (!AUDIT_READ_ROLES.has(S.role)) {
     document.getElementById('admin-users-pane').innerHTML='<div class="empty"><p>Not authorized.</p></div>';
     return;
   }
   document.getElementById('admin-users-pane').innerHTML='<div class="loading"><div class="spinner"></div></div>';
   try {
     const users = await API.users();
-    let h = '<div class="table-wrap"><table class="data-table"><tr><th>User</th><th>Role</th><th>Status</th><th></th></tr>';
+    const canManage = ADMIN_ROLES.has(S.role);
+    let h = '<div class="table-wrap"><table class="data-table"><tr><th>User</th><th>Role</th><th>Status</th>';
+    if (canManage) h += '<th></th>';
+    h += '</tr>';
     users.forEach(u=>{
       const active = u.is_active;
       h += `<tr>
-        <td><b>${esc(u.username)}</b><br><small style="color:var(--gray)">${esc(u.full_name)}</small></td>
+        <td><b>${esc(u.username)}</b><br><small style="color:var(--gray)">${esc(u.full_name||'')}</small>
+        ${u.last_login?`<br><small style="color:var(--gray);font-size:10px">Last: ${u.last_login.slice(0,16)}</small>`:''}
+        </td>
         <td><span class="badge badge-blue">${esc(u.role)}</span></td>
-        <td><span class="badge ${active?'badge-green':'badge-red'}">${active?'Active':'Inactive'}</span></td>
-        <td>
+        <td><span class="badge ${active?'badge-green':'badge-red'}">${active?'Active':'Inactive'}</span></td>`;
+      if (canManage) {
+        h += `<td>
           <button class="btn btn-outline btn-sm" onclick="resetUserPassword('${esc(u.username)}')">Reset Password</button>
           ${active
             ?`<button class="btn btn-danger btn-sm" onclick="toggleUser('${esc(u.username)}',false)">Deactivate</button>`
             :`<button class="btn btn-success btn-sm" onclick="toggleUser('${esc(u.username)}',true)">Activate</button>`
           }
-        </td>
-      </tr>`;
+        </td>`;
+      }
+      h += '</tr>';
     });
     h += '</table></div>';
     document.getElementById('admin-users-pane').innerHTML = h;
@@ -719,9 +865,15 @@ async function loadAudit() {
   try {
     const rows = await API.audit();
     if (!rows.length){ document.getElementById('admin-audit-pane').innerHTML='<div class="empty"><p>No audit entries.</p></div>'; return; }
-    let h='<div class="table-wrap"><table class="data-table"><tr><th>Time</th><th>User</th><th>Action</th><th>Module</th></tr>';
+    let h='<div class="table-wrap"><table class="data-table"><tr><th>Time</th><th>User</th><th>Action</th><th>Module</th><th>IP</th></tr>';
     rows.forEach(r=>{
-      h+=`<tr><td style="white-space:nowrap">${(r.created_at||'').slice(0,16)}</td><td>${esc(r.username||'')}</td><td>${esc(r.action)}</td><td>${esc(r.module||'')}</td></tr>`;
+      h+=`<tr>
+        <td style="white-space:nowrap">${(r.created_at||'').slice(0,16)}</td>
+        <td>${esc(r.username||'')}</td>
+        <td>${esc(r.action)}</td>
+        <td>${esc(r.module||'')}</td>
+        <td style="font-size:11px;color:var(--gray)">${esc(r.ip_address||'')}</td>
+      </tr>`;
     });
     h+='</table></div>';
     document.getElementById('admin-audit-pane').innerHTML=h;
@@ -731,14 +883,16 @@ async function loadAudit() {
 async function saveNewUser() {
   const u=document.getElementById('nu-user').value.trim();
   const n=document.getElementById('nu-name').value.trim();
+  const em=document.getElementById('nu-email')?.value.trim()||'';
   const r=document.getElementById('nu-role').value;
   const p=document.getElementById('nu-pass').value;
   if(!u||!p){ toast('Username and password required.'); return; }
   try {
-    await API.saveUser({username:u,full_name:n,role:r,new_password:p});
+    await API.saveUser({username:u,full_name:n,email:em,role:r,new_password:p});
     toast('User saved.');
     document.getElementById('nu-user').value='';
     document.getElementById('nu-name').value='';
+    if(document.getElementById('nu-email')) document.getElementById('nu-email').value='';
     document.getElementById('nu-pass').value='';
     loadAdminUsers(); adminTab('users');
   } catch(e){ toast('Error: '+e.message, 4000); }
@@ -812,6 +966,334 @@ function toggleSearch() {
   }
 }
 
+// ── Compliance ─────────────────────────────────────────────────────────────
+
+// Config for each compliance entity
+const COMP = {
+  privdash: { title: 'Privacy Dashboard' },
+  dsr: {
+    title: 'Data Subject Requests',
+    apiGet: () => API.compDsr(),
+    apiCreate: d => API.compDsrCreate(d),
+    apiUpdate: (id,d) => API.compDsrUpdate(id,d),
+    cols: [
+      {k:'subject_name', l:'Subject'},
+      {k:'request_type', l:'Type'},
+      {k:'status', l:'Status', badge: statusBadge},
+      {k:'due_date', l:'Due'},
+    ],
+    fields: [
+      {k:'subject_name', l:'Subject Name', t:'text', req:true},
+      {k:'subject_email', l:'Subject Email', t:'email'},
+      {k:'request_type', l:'Request Type', t:'select', opts:['Access','Erasure','Correction','Portability','Restriction','Objection']},
+      {k:'received_date', l:'Received Date', t:'date'},
+      {k:'due_date', l:'Due Date', t:'date'},
+      {k:'status', l:'Status', t:'select', opts:['Open','In Progress','Completed','Rejected','Extended']},
+      {k:'notes', l:'Notes', t:'textarea'},
+    ],
+    idField: 'id',
+  },
+  breach: {
+    title: 'Personal Data Breach Register',
+    apiGet: () => API.compBreach(),
+    apiCreate: d => API.compBreachCreate(d),
+    apiUpdate: (id,d) => API.compBreachUpdate(id,d),
+    cols: [
+      {k:'title', l:'Title'},
+      {k:'severity', l:'Severity', badge: severityBadge},
+      {k:'status', l:'Status', badge: statusBadge},
+      {k:'discovered_date', l:'Discovered'},
+    ],
+    fields: [
+      {k:'title', l:'Breach Title', t:'text', req:true},
+      {k:'discovered_date', l:'Discovered Date', t:'date'},
+      {k:'description', l:'Description', t:'textarea'},
+      {k:'severity', l:'Severity', t:'select', opts:['Low','Medium','High','Critical']},
+      {k:'categories_affected', l:'Data Categories Affected', t:'text'},
+      {k:'systems_affected', l:'Systems Affected', t:'text'},
+      {k:'dpa_notified', l:'DPA Notified?', t:'select', opts:['No','Yes']},
+      {k:'dpa_notification_date', l:'DPA Notification Date', t:'date'},
+      {k:'subjects_notified', l:'Subjects Notified?', t:'select', opts:['No','Yes']},
+      {k:'status', l:'Status', t:'select', opts:['Open','Contained','Resolved','Closed']},
+      {k:'remediation', l:'Remediation Actions', t:'textarea'},
+    ],
+    idField: 'id',
+  },
+  consent: {
+    title: 'Consent Register',
+    apiGet: () => API.compConsent(),
+    apiCreate: d => API.compConsentCreate(d),
+    apiUpdate: (id,d) => API.compConsentUpdate(id,d),
+    cols: [
+      {k:'subject_name', l:'Subject'},
+      {k:'purpose', l:'Purpose'},
+      {k:'status', l:'Status', badge: consentBadge},
+      {k:'given_date', l:'Date Given'},
+    ],
+    fields: [
+      {k:'subject_name', l:'Subject Name', t:'text', req:true},
+      {k:'subject_email', l:'Subject Email', t:'email'},
+      {k:'purpose', l:'Purpose', t:'text', req:true},
+      {k:'method', l:'Method', t:'select', opts:['Written','Verbal','Electronic','Implicit']},
+      {k:'status', l:'Status', t:'select', opts:['Given','Withdrawn','Expired']},
+      {k:'given_date', l:'Date Given', t:'date'},
+      {k:'withdrawn_date', l:'Date Withdrawn', t:'date'},
+      {k:'scope', l:'Scope / Notes', t:'textarea'},
+    ],
+    idField: 'id',
+  },
+  processors: {
+    title: 'Third-Party Processor Register',
+    apiGet: () => API.compProcessors(),
+    apiCreate: d => API.compProcessorsCreate(d),
+    apiUpdate: (id,d) => API.compProcessorsUpdate(id,d),
+    cols: [
+      {k:'name', l:'Processor'},
+      {k:'country', l:'Country'},
+      {k:'dpa_in_place', l:'DPA?', badge: v=>v==='Yes'?'<span class="badge badge-green">Yes</span>':'<span class="badge badge-red">No</span>'},
+      {k:'review_date', l:'Review Due'},
+    ],
+    fields: [
+      {k:'name', l:'Processor Name', t:'text', req:true},
+      {k:'country', l:'Country', t:'text'},
+      {k:'services', l:'Services Provided', t:'text'},
+      {k:'contact_name', l:'Contact Name', t:'text'},
+      {k:'contact_email', l:'Contact Email', t:'email'},
+      {k:'dpa_in_place', l:'DPA in Place?', t:'select', opts:['No','Yes']},
+      {k:'dpa_date', l:'DPA Signed Date', t:'date'},
+      {k:'review_date', l:'Review Due Date', t:'date'},
+      {k:'risk_level', l:'Risk Level', t:'select', opts:['Low','Medium','High']},
+    ],
+    idField: 'id',
+  },
+  retention: {
+    title: 'Retention Schedules',
+    apiGet: () => API.compRetention(),
+    apiCreate: d => API.compRetentionCreate(d),
+    apiUpdate: (id,d) => API.compRetentionUpdate(id,d),
+    cols: [
+      {k:'category', l:'Category'},
+      {k:'retention_years', l:'Years'},
+      {k:'disposal_method', l:'Disposal'},
+      {k:'legal_hold', l:'Legal Hold', badge: v=>v==='Yes'?'<span class="badge badge-orange">Hold</span>':''},
+    ],
+    fields: [
+      {k:'category', l:'Data Category', t:'text', req:true},
+      {k:'retention_years', l:'Retention Years', t:'number'},
+      {k:'disposal_method', l:'Disposal Method', t:'select', opts:['Deletion','Anonymization','Shredding','Transfer']},
+      {k:'legal_hold', l:'Legal Hold?', t:'select', opts:['No','Yes']},
+      {k:'legal_hold_reason', l:'Legal Hold Reason', t:'text'},
+      {k:'last_review_date', l:'Last Review Date', t:'date'},
+    ],
+    idField: 'id',
+  },
+  training: {
+    title: 'Privacy Training Records',
+    apiGet: () => API.compTraining(),
+    apiCreate: d => API.compTrainingCreate(d),
+    cols: [
+      {k:'username', l:'User'},
+      {k:'training_name', l:'Training'},
+      {k:'completed_at', l:'Completed'},
+      {k:'expiry_date', l:'Expires'},
+    ],
+    fields: [
+      {k:'username', l:'Username', t:'text', req:true},
+      {k:'training_name', l:'Training Name', t:'text', req:true},
+      {k:'completed_at', l:'Completed Date', t:'date'},
+      {k:'expiry_date', l:'Expiry Date', t:'date'},
+      {k:'notes', l:'Notes / Certificate Ref', t:'text'},
+    ],
+    idField: 'id',
+  },
+};
+
+function statusBadge(v) {
+  const m = {Open:'badge-blue','In Progress':'badge-gray',Completed:'badge-green',Rejected:'badge-red',Extended:'badge-orange',Contained:'badge-orange',Resolved:'badge-green',Closed:'badge-gray'};
+  return `<span class="badge ${m[v]||'badge-gray'}">${esc(v||'')}</span>`;
+}
+function severityBadge(v) {
+  const m = {Low:'badge-green',Medium:'badge-orange',High:'badge-red',Critical:'badge-red'};
+  return `<span class="badge ${m[v]||'badge-gray'}">${esc(v||'')}</span>`;
+}
+function consentBadge(v) {
+  const m = {Given:'badge-green',Withdrawn:'badge-red',Expired:'badge-gray'};
+  return `<span class="badge ${m[v]||'badge-gray'}">${esc(v||'')}</span>`;
+}
+
+function compTab(name) {
+  S.compSubTab = name;
+  S.compEditId = null;
+  S.compShowForm[name] = false;
+  // Update inner tab active state
+  document.querySelectorAll('#admin-compliance-pane > .tab-bar .tab').forEach(t=>t.classList.toggle('active', t.dataset.ctab===name));
+  ['privdash','dsr','breach','consent','processors','retention','training'].forEach(n=>{
+    const el = document.getElementById('comp-'+n);
+    if (el) el.style.display = n===name ? '' : 'none';
+  });
+  if (name === 'privdash') loadCompDash();
+  else loadCompList(name);
+}
+
+async function loadCompDash() {
+  const el = document.getElementById('comp-privdash');
+  el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const d = await API.compDash();
+    const metrics = [
+      {key:'dsr_open', lbl:'Open DSRs', cls: d.dsr_open>0?'warn':''},
+      {key:'dsr_overdue', lbl:'Overdue DSRs', cls: d.dsr_overdue>0?'danger':''},
+      {key:'breach_open', lbl:'Open Breaches', cls: d.breach_open>0?'danger':''},
+      {key:'breach_unnotified_dpa', lbl:'Breaches Unnotified to DPA', cls: d.breach_unnotified_dpa>0?'danger':''},
+      {key:'consent_withdrawn', lbl:'Withdrawn Consents', cls: d.consent_withdrawn>0?'warn':''},
+      {key:'processors_without_dpa', lbl:'Processors Without DPA', cls: d.processors_without_dpa>0?'warn':''},
+      {key:'users_needing_training', lbl:'Users Needing Training', cls: d.users_needing_training>0?'warn':''},
+    ];
+    let h = '<div class="card"><div class="card-header">&#128274; Privacy Compliance Dashboard</div><div class="stat-grid">';
+    metrics.forEach(m=>{
+      const val = d[m.key] ?? '—';
+      h += `<div class="stat-cell ${m.cls}"><div class="stat-val">${val}</div><div class="stat-lbl">${m.lbl}</div></div>`;
+    });
+    h += '</div></div>';
+    el.innerHTML = h;
+  } catch(e){ el.innerHTML=`<div class="empty"><p>${e.message}</p></div>`; }
+}
+
+async function loadCompList(type) {
+  const cfg = COMP[type];
+  if (!cfg) return;
+  const el = document.getElementById('comp-'+type);
+  el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const rows = await cfg.apiGet();
+    renderCompList(type, rows);
+  } catch(e){ el.innerHTML=`<div class="empty"><p>${e.message}</p></div>`; }
+}
+
+function renderCompList(type, rows) {
+  const cfg = COMP[type];
+  const el = document.getElementById('comp-'+type);
+  const canWrite = COMPLIANCE_ROLES.has(S.role);
+  let h = '';
+
+  if (canWrite && cfg.apiCreate) {
+    h += `<div style="padding:10px 14px">
+      <button class="btn btn-primary btn-sm" onclick="toggleCompForm('${type}')">&#10133; Add New</button>
+    </div>`;
+  }
+
+  // Inline add/edit form
+  if (S.compShowForm[type]) {
+    h += renderCompFormHTML(type);
+  }
+
+  if (!rows || !rows.length) {
+    h += '<div class="empty" style="padding:24px"><div class="ico">&#128196;</div><p>No records found.</p></div>';
+    el.innerHTML = h;
+    return;
+  }
+
+  h += '<div class="table-wrap" style="margin:0 14px 14px"><table class="data-table"><tr>';
+  cfg.cols.forEach(c => h += `<th>${c.l}</th>`);
+  h += '</tr>';
+  rows.forEach(r => {
+    const rowJson = JSON.stringify(r).replace(/"/g,'&quot;');
+    h += `<tr class="clickable" onclick='showCompFormEdit("${type}",${rowJson})'>`;
+    cfg.cols.forEach(c => {
+      const v = r[c.k] ?? '';
+      const display = c.badge ? c.badge(String(v)) : `<span style="font-size:13px">${esc(String(v))}</span>`;
+      h += `<td>${display}</td>`;
+    });
+    h += '</tr>';
+  });
+  h += '</table></div>';
+  el.innerHTML = h;
+}
+
+function toggleCompForm(type) {
+  S.compShowForm[type] = !S.compShowForm[type];
+  S.compEditId = null;
+  loadCompList(type);
+}
+
+function showCompFormEdit(type, row) {
+  S.compShowForm[type] = true;
+  S.compEditId = row.id || null;
+  S._compEditRow = row;
+  loadCompList(type).then(()=>{
+    // Pre-fill form after re-render
+    const cfg = COMP[type];
+    if (!cfg) return;
+    cfg.fields.forEach(f => {
+      const el = document.getElementById(`cff_${type}_${f.k}`);
+      if (el) el.value = row[f.k] ?? '';
+    });
+    // Scroll to form
+    document.getElementById('comp-'+type)?.querySelector('.comp-form')?.scrollIntoView({behavior:'smooth',block:'nearest'});
+  });
+}
+
+function renderCompFormHTML(type) {
+  const cfg = COMP[type];
+  if (!cfg || !cfg.fields) return '';
+  const isEdit = !!S.compEditId;
+  const row = isEdit ? (S._compEditRow || {}) : {};
+  let h = `<div class="comp-form">
+    <div class="comp-form-header">${isEdit?'Edit':'New'} ${cfg.title.replace(' Register','').replace(' Schedules','')}</div>`;
+  cfg.fields.forEach(f => {
+    const val = row[f.k] ?? '';
+    h += `<div class="form-group"><label>${esc(f.l)}</label>`;
+    if (f.t === 'textarea') {
+      h += `<textarea id="cff_${type}_${f.k}">${esc(String(val))}</textarea>`;
+    } else if (f.t === 'select') {
+      h += `<select id="cff_${type}_${f.k}"><option value=""></option>${f.opts.map(o=>`<option${o===val?' selected':''}>${esc(o)}</option>`).join('')}</select>`;
+    } else {
+      h += `<input id="cff_${type}_${f.k}" type="${f.t||'text'}" value="${esc(String(val))}">`;
+    }
+    h += '</div>';
+  });
+  h += `<div class="btn-row">
+    <button class="btn btn-success btn-sm" onclick="saveCompForm('${type}')">&#128190; ${isEdit?'Save':'Create'}</button>
+    <button class="btn btn-outline btn-sm" onclick="cancelCompForm('${type}')">Cancel</button>
+  </div></div>`;
+  return h;
+}
+
+function cancelCompForm(type) {
+  S.compShowForm[type] = false;
+  S.compEditId = null;
+  S._compEditRow = null;
+  loadCompList(type);
+}
+
+async function saveCompForm(type) {
+  const cfg = COMP[type];
+  if (!cfg) return;
+  const data = {};
+  let missing = null;
+  cfg.fields.forEach(f => {
+    const el = document.getElementById(`cff_${type}_${f.k}`);
+    if (el) {
+      data[f.k] = el.value;
+      if (f.req && !el.value.trim()) missing = f.l;
+    }
+  });
+  if (missing) { toast(`${missing} is required.`); return; }
+  try {
+    if (S.compEditId) {
+      await cfg.apiUpdate(S.compEditId, data);
+      toast('Record updated.');
+    } else {
+      await cfg.apiCreate(data);
+      toast('Record created.');
+    }
+    S.compShowForm[type] = false;
+    S.compEditId = null;
+    S._compEditRow = null;
+    loadCompList(type);
+  } catch(e){ toast('Error: '+e.message, 4000); }
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 function cap(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -821,9 +1303,16 @@ function modIcon(m){
 
 // ── Init ───────────────────────────────────────────────────────────────────
 function initApp() {
-  // Show/hide admin nav
-  const adminRoles = ['Owner','Business Manager'];
-  document.getElementById('nav-admin').style.display = adminRoles.includes(S.role)?'':'none';
+  document.getElementById('nav-admin').style.display = AUDIT_READ_ROLES.has(S.role) || COMPLIANCE_ROLES.has(S.role) ? '' : 'none';
+  // Pre-seed default role dropdown until modules load
+  const sel = document.getElementById('nu-role');
+  if (sel && !sel.options.length) {
+    ['Owner','Business Manager','Super Admin','Manager','DPO/Privacy Officer',
+     'Finance User','Sales/Booking User','Customer Service User','Auditor',
+     'Sales Agent','Ticketing Officer','Finance Officer','Viewer']
+    .forEach(r => { const o=document.createElement('option'); o.textContent=r; sel.appendChild(o); });
+    sel.value = 'Sales/Booking User';
+  }
   navTo('dashboard');
 }
 
