@@ -471,18 +471,26 @@ namespace SaUsErpInstaller
             return Directory.Exists(def) ? def : null;
         }
 
-        private static Label Title(string text, int x, int y) =>
-            new Label { Text = text, Font = new Font("Segoe UI", 13, FontStyle.Bold),
+        private static Label Title(string text, int x, int y)
+        {
+            return new Label { Text = text, Font = new Font("Segoe UI", 13, FontStyle.Bold),
                 ForeColor = Color.FromArgb(24, 103, 192), AutoSize = true, Location = new Point(x, y) };
+        }
 
-        private static Label BodyLabel(string text, int x, int y, int width) =>
-            new Label { Text = text, Font = new Font("Segoe UI", 10), AutoSize = false,
+        private static Label BodyLabel(string text, int x, int y, int width)
+        {
+            return new Label { Text = text, Font = new Font("Segoe UI", 10), AutoSize = false,
                 Size = new Size(width, 160), Location = new Point(x, y) };
+        }
 
-        private static Label SmallLabel(string text, int x, int y) =>
-            new Label { Text = text, Font = new Font("Segoe UI", 10), AutoSize = true, Location = new Point(x, y) };
+        private static Label SmallLabel(string text, int x, int y)
+        {
+            return new Label { Text = text, Font = new Font("Segoe UI", 10), AutoSize = true, Location = new Point(x, y) };
+        }
 
-        private static RadioButton Radio(string text, int x, int y) =>
-            new RadioButton { Text = text, Font = new Font("Segoe UI", 10), AutoSize = true, Location = new Point(x, y) };
+        private static RadioButton Radio(string text, int x, int y)
+        {
+            return new RadioButton { Text = text, Font = new Font("Segoe UI", 10), AutoSize = true, Location = new Point(x, y) };
+        }
     }
 }
