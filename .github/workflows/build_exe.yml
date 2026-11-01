@@ -120,6 +120,8 @@ jobs:
 
           # Compile single-file setup EXE with payload embedded as resources
           & $csc /target:winexe /optimize+ /nologo `
+            /reference:System.Windows.Forms.dll `
+            /reference:System.Drawing.dll `
             "/out:$outExe" `
             "/resource:$zipPath,payload.zip" `
             "/resource:$srcDir\install.cmd,install.cmd" `

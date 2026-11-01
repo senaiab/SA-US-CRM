@@ -2,7 +2,8 @@
     [string]$InstallDir = "$env:LOCALAPPDATA\Programs\SA-US ERP",
     [ValidateSet("", "server", "client", "both")]
     [string]$InstallMode = "",
-    [switch]$SkipShortcuts
+    [switch]$SkipShortcuts,
+    [switch]$SkipMaintenanceDialog
 )
 
 $ErrorActionPreference = "Stop"
@@ -584,7 +585,7 @@ try {
     }
 
     $existingInstallDir = Get-ExistingInstallDir
-    if ($existingInstallDir -and !$SkipShortcuts) {
+    if ($existingInstallDir -and !$SkipShortcuts -and !$SkipMaintenanceDialog) {
         $maintenanceAction = Select-MaintenanceAction -ExistingDir $existingInstallDir
         if ($maintenanceAction -eq "remove") {
             $uninstallCmd = Join-Path $existingInstallDir "uninstall.cmd"
