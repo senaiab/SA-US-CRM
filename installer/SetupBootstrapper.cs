@@ -126,9 +126,9 @@ namespace SaUsErpInstaller
             var p = new Panel();
             p.Controls.Add(Title("Welcome to SA-US ERP Setup", 24, 22));
             p.Controls.Add(BodyLabel(
-                "This wizard will install SA-US ERP v2.3.0 on your computer.\n\n" +
+                "This wizard will install SA-US ERP v2.5.0 on your computer.\n\n" +
                 "SA-US ERP is a business management system that includes:\n\n" +
-                "   Server — runs on the main office PC, requires MariaDB / MySQL\n" +
+                "   Server — runs on the main office PC (MariaDB database included)\n" +
                 "   Client — runs on any staff PC and connects to the server\n\n" +
                 "Click Next to continue or Cancel to exit.",
                 24, 76, 530));
@@ -330,7 +330,7 @@ namespace SaUsErpInstaller
                 "SA-US-ERP-" + Guid.NewGuid().ToString("N").Substring(0, 10));
             try
             {
-                Log("SA-US ERP Installer v2.3.0", Color.FromArgb(110, 185, 255));
+                Log("SA-US ERP Installer v2.5.0", Color.FromArgb(110, 185, 255));
                 Log(new string('-', 42), Color.FromArgb(70, 70, 70));
                 Log("Extracting installer resources...");
 
@@ -410,7 +410,7 @@ namespace SaUsErpInstaller
                 _lblDoneTitle.Text      = "Installation Complete!";
                 _lblDoneTitle.ForeColor = Color.FromArgb(0, 128, 0);
                 _lblDoneDetail.Text     =
-                    "SA-US ERP v2.3.0 has been installed to:\n" + _installDir +
+                    "SA-US ERP v2.5.0 has been installed to:\n" + _installDir +
                     "\n\nDesktop and Start Menu shortcuts have been created for the installed components.";
                 _btnOpenFolder.Enabled = true;
             }
