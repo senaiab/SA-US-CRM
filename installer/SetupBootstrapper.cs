@@ -82,7 +82,18 @@ namespace SaUsErpInstaller
             };
             Controls.Add(header);
 
-            // Button bar
+            // Content area — must be added BEFORE bottom bar so Fill gets remaining space
+            var content = new Panel { Dock = DockStyle.Fill };
+            _pages = new Panel[5];
+            _pages[0] = BuildPage0_Welcome();
+            _pages[1] = BuildPage1_Mode();
+            _pages[2] = BuildPage2_Directory();
+            _pages[3] = BuildPage3_Progress();
+            _pages[4] = BuildPage4_Done();
+            foreach (var p in _pages) { p.Dock = DockStyle.Fill; p.Visible = false; content.Controls.Add(p); }
+            Controls.Add(content);
+
+            // Button bar — added after Fill so it docks to bottom correctly
             var bar = new Panel { Dock = DockStyle.Bottom, Height = 52, BackColor = Color.FromArgb(242, 242, 242) };
             bar.Paint += (s, e) => e.Graphics.DrawLine(new Pen(Color.FromArgb(200, 200, 200)), 0, 0, bar.Width, 0);
 
@@ -96,17 +107,6 @@ namespace SaUsErpInstaller
 
             bar.Controls.AddRange(new Control[] { _btnBack, _btnNext, _btnCancel });
             Controls.Add(bar);
-
-            // Content area
-            var content = new Panel { Dock = DockStyle.Fill };
-            _pages = new Panel[5];
-            _pages[0] = BuildPage0_Welcome();
-            _pages[1] = BuildPage1_Mode();
-            _pages[2] = BuildPage2_Directory();
-            _pages[3] = BuildPage3_Progress();
-            _pages[4] = BuildPage4_Done();
-            foreach (var p in _pages) { p.Dock = DockStyle.Fill; p.Visible = false; content.Controls.Add(p); }
-            Controls.Add(content);
         }
 
         private Button NavBtn(string text, int x)
