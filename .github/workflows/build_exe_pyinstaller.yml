@@ -89,6 +89,9 @@ jobs:
           Copy-Item "$root\dist\client\SA_US_ERP_Client.exe" "$payload\client\"
           Copy-Item -Recurse "$root\dist\client\branding"    "$payload\client\branding"
           Copy-Item -Recurse "$root\sql\."                   "$payload\sql\"
+          if (Test-Path "$root\README.txt") {
+            Copy-Item "$root\README.txt" "$payload\README.txt"
+          }
           if (Test-Path "$root\server\server_config.example.ini") {
             Copy-Item "$root\server\server_config.example.ini" "$payload\server\"
           }

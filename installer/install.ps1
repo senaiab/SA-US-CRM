@@ -606,9 +606,18 @@ try {
     "InstallMode=$InstallMode" | Out-File -FilePath $logPath -Append -Encoding utf8
 
     New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
-    Copy-Item -LiteralPath (Join-Path $payloadRoot "README.txt") -Destination (Join-Path $InstallDir "README.txt") -Force
-    Copy-TreePreservingConfig -Source (Join-Path $payloadRoot "docs") -Destination (Join-Path $InstallDir "docs")
-    Copy-TreePreservingConfig -Source (Join-Path $payloadRoot "tools") -Destination $InstallDir
+    $readmeSrc = Join-Path $payloadRoot "README.txt"
+    if (Test-Path -LiteralPath $readmeSrc) {
+        Copy-Item -LiteralPath $readmeSrc -Destination (Join-Path $InstallDir "README.txt") -Force
+    }
+    $docsSrc = Join-Path $payloadRoot "docs"
+    if (Test-Path -LiteralPath $docsSrc) {
+        Copy-TreePreservingConfig -Source $docsSrc -Destination (Join-Path $InstallDir "docs")
+    }
+    $toolsSrc = Join-Path $payloadRoot "tools"
+    if (Test-Path -LiteralPath $toolsSrc) {
+        Copy-TreePreservingConfig -Source $toolsSrc -Destination $InstallDir
+    }
     Copy-TreePreservingConfig -Source (Join-Path $payloadRoot "uninstall") -Destination $InstallDir
     if ($InstallMode -eq "server" -or $InstallMode -eq "both") {
         Copy-TreePreservingConfig -Source (Join-Path $payloadRoot "server") -Destination (Join-Path $InstallDir "server")
