@@ -23,7 +23,7 @@ function New-Shortcut {
         $shortcut.WorkingDirectory = $WorkingDirectory
     }
     if ($IconLocation) {
-        $shortcut.IconLocation = $IconLocation
+        $shortcut.IconLocation = "$IconLocation,0"
     }
     $shortcut.Save()
 }
@@ -281,18 +281,6 @@ pause
         $startMenuDir = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\SA-US ERP"
         $desktopDir = [Environment]::GetFolderPath("Desktop")
         New-Item -ItemType Directory -Force -Path $startMenuDir | Out-Null
-
-        New-Shortcut `
-            -ShortcutPath (Join-Path $startMenuDir "SA-US ERP Configuration.lnk") `
-            -TargetPath $configExe `
-            -WorkingDirectory $InstallDir `
-            -IconLocation $clientIcon
-
-        New-Shortcut `
-            -ShortcutPath (Join-Path $desktopDir "SA-US ERP Configuration.lnk") `
-            -TargetPath $configExe `
-            -WorkingDirectory $InstallDir `
-            -IconLocation $clientIcon
 
         if ($InstallMode -eq "server" -or $InstallMode -eq "both") {
             New-Shortcut `

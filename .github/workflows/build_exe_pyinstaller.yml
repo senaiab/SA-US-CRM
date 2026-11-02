@@ -124,6 +124,7 @@ jobs:
           & $csc /target:winexe /optimize+ /nologo `
             /reference:System.Windows.Forms.dll `
             /reference:System.Drawing.dll `
+            "/win32icon:$root\build_icon.ico" `
             "/out:$outExe" `
             "/resource:$zipPath,payload.zip" `
             "/resource:$srcDir\install.cmd,install.cmd" `
