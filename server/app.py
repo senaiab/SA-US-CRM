@@ -25,7 +25,7 @@ BASE_DIR = Path(__file__).resolve().parent
 config = configparser.ConfigParser()
 config.read(BASE_DIR / "server_config.ini")
 
-DATABASE_URL = config.get("database", "url", fallback="")
+DATABASE_URL = config.get("database", "url", fallback="sqlite:///./sa_us_erp.db")
 _secret = config.get("server", "secret_key", fallback="")
 if not _secret or _secret == "CHANGE_THIS_TO_A_RANDOM_SECRET":
     import secrets as _secrets
@@ -54,7 +54,8 @@ def utcnow() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
-engine = create_engine(DATABASE_URL, pool_pre_ping=True, future=True)
+_connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
+engine = create_engine(DATABASE_URL, pool_pre_ping=True, future=True, connect_args=_connect_args)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine, future=True)
 Base = declarative_base()
 pwd_context = CryptContext(schemes=["pbkdf2_sha256", "bcrypt"], deprecated="auto")
@@ -697,7 +698,7 @@ def initialize_database():
 async def lifespan(app: FastAPI):
     if not initialize_database():
         print("Database connection failed. Server is running in setup mode.")
-        print("Check MariaDB/MySQL and server_config.ini, then retry /health or restart the server.")
+        print("Check database and server_config.ini, then retry /health or restart the server.")
         print(_database_error)
     yield
 
@@ -727,7 +728,7 @@ def health():
             status_code=503,
             detail={
                 "status": "setup_required",
-                "message": "Database connection failed. Check MariaDB/MySQL and server_config.ini.",
+                "message": "Database connection failed. Check database and server_config.ini.",
                 "database_error": _database_error,
             },
         )
