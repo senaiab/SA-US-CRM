@@ -55,10 +55,13 @@ namespace SaUsErpInstaller
 
         private bool _installSuccess;
         private bool _uninstallMode;
+        private bool _updateMode;
         private string _installDir;
         private string _existingDir;
+        private string _installedVersion;
 
-        // Page 1 — uninstall option (only when existing install found)
+        // Page 1 — extra options only when existing install found
+        private RadioButton _rbUpdate;
         private RadioButton _rbUninstall;
 
         public int ExitCode { get; private set; }
@@ -158,7 +161,7 @@ namespace SaUsErpInstaller
         private TabPage BuildPage0_Welcome()
         {
             var p = NewPage();
-            p.Controls.Add(MakeTitle("Welcome to SA-US ERP Setup v2.7.0", 24, 18));
+            p.Controls.Add(MakeTitle("Welcome to SA-US ERP Setup v2.8.4", 24, 18));
             p.Controls.Add(MakeLabel(
                 "This wizard will install SA-US ERP on your computer.\r\n\r\n" +
                 "SA-US ERP is a business management system that includes:\r\n\r\n" +
@@ -174,24 +177,33 @@ namespace SaUsErpInstaller
             var p = NewPage();
             if (_existingDir != null)
             {
-                // Existing install — layout shifted down to avoid label/radio overlap
+                _installedVersion = GetInstalledVersion();
+                string updateLabel = string.IsNullOrEmpty(_installedVersion)
+                    ? "Update SA-US ERP to v2.8.4  (recommended)  \u2014  preserves database & config"
+                    : "Update from v" + _installedVersion + " to v2.8.4  (recommended)  \u2014  preserves database & config";
+
                 p.Controls.Add(MakeTitle("Existing Installation Found", 24, 18));
                 p.Controls.Add(MakeLabel(
                     "SA-US ERP is already installed at:\r\n" + _existingDir +
                     "\r\n\r\nChoose an option below:",
-                    24, 62, 520, 76));
+                    24, 62, 520, 60));
 
-                _rbServer = MakeRadio("Server only  \u2014  main office PC",                        40, 152);
-                _rbClient = MakeRadio("Client only  \u2014  staff PC connecting over the network",   40, 184);
-                _rbBoth   = MakeRadio("Both server and client  (recommended for single-PC setup)",   40, 216);
-                _rbBoth.Checked = true;
-                p.Controls.AddRange(new Control[] { _rbServer, _rbClient, _rbBoth });
+                _rbUpdate = MakeRadio(updateLabel, 40, 130);
+                _rbUpdate.ForeColor = Color.FromArgb(0, 120, 0);
+                _rbUpdate.Checked = true;
 
-                // Uninstall option — only shown when existing install found
-                var sep2 = new Panel { BackColor = Color.FromArgb(200, 200, 200), Bounds = new Rectangle(24, 254, 520, 1) };
-                _rbUninstall = MakeRadio("Remove / Uninstall SA-US ERP from this computer", 40, 264);
+                var sep1 = new Panel { BackColor = Color.FromArgb(210, 210, 210), Bounds = new Rectangle(24, 168, 520, 1) };
+                p.Controls.Add(MakeSmall("Reinstall / Repair:", 24, 176));
+
+                _rbServer = MakeRadio("Server only  \u2014  main office PC",                        40, 198);
+                _rbClient = MakeRadio("Client only  \u2014  staff PC connecting over the network",   40, 228);
+                _rbBoth   = MakeRadio("Both server and client",                                      40, 258);
+
+                var sep2 = new Panel { BackColor = Color.FromArgb(210, 210, 210), Bounds = new Rectangle(24, 284, 520, 1) };
+                _rbUninstall = MakeRadio("Remove / Uninstall SA-US ERP from this computer", 40, 294);
                 _rbUninstall.ForeColor = Color.DarkRed;
-                p.Controls.AddRange(new Control[] { sep2, _rbUninstall });
+
+                p.Controls.AddRange(new Control[] { _rbUpdate, sep1, _rbServer, _rbClient, _rbBoth, sep2, _rbUninstall });
             }
             else
             {
@@ -341,6 +353,8 @@ namespace SaUsErpInstaller
                     _btnCancel.Enabled = false;
                     if (_uninstallMode && _lblProgressTitle != null)
                         _lblProgressTitle.Text = "Removing SA-US ERP...";
+                    else if (_updateMode && _lblProgressTitle != null)
+                        _lblProgressTitle.Text = "Updating SA-US ERP...";
                     StartInstall();
                     break;
                 case 4:
@@ -354,6 +368,14 @@ namespace SaUsErpInstaller
         {
             int page = _tab.SelectedIndex;
             if (page == 4) { ExitCode = _installSuccess ? 0 : 1; Close(); return; }
+
+            // Update path: skip directory page, use existing dir, go straight to progress
+            if (page == 1 && _rbUpdate != null && _rbUpdate.Checked)
+            {
+                _updateMode = true;
+                ShowPage(3);
+                return;
+            }
 
             // Uninstall path: skip directory page, go straight to progress
             if (page == 1 && _rbUninstall != null && _rbUninstall.Checked)
@@ -389,7 +411,7 @@ namespace SaUsErpInstaller
 
         private void StartInstall()
         {
-            _installDir = _uninstallMode ? _existingDir : _txtDir.Text.Trim();
+            _installDir = (_uninstallMode || _updateMode) ? _existingDir : _txtDir.Text.Trim();
             new Thread(RunInstall) { IsBackground = true }.Start();
         }
 
@@ -401,7 +423,7 @@ namespace SaUsErpInstaller
                 "SA-US-ERP-" + Guid.NewGuid().ToString("N").Substring(0, 10));
             try
             {
-                Log("SA-US ERP Installer v2.7.0", Color.FromArgb(110, 185, 255));
+                Log("SA-US ERP Installer v2.8.4", Color.FromArgb(110, 185, 255));
                 Log(new string('-', 44), Color.FromArgb(70, 70, 70));
                 Log("Extracting installer resources...");
 
@@ -413,25 +435,42 @@ namespace SaUsErpInstaller
                 Log("Resources extracted.", Color.FromArgb(100, 210, 100));
 
                 string mode = "both";
-                Invoke(new Action(() =>
+                if (_updateMode)
                 {
-                    if (_rbServer.Checked)      mode = "server";
-                    else if (_rbClient.Checked) mode = "client";
-                    else                        mode = "both";
-                }));
+                    // Auto-detect which components are installed
+                    bool hasServer = Directory.Exists(Path.Combine(_installDir, "server"));
+                    bool hasClient = Directory.Exists(Path.Combine(_installDir, "client"));
+                    if (hasServer && !hasClient)      mode = "server";
+                    else if (hasClient && !hasServer) mode = "client";
+                    else                              mode = "both";
+                    Log("Detected installed components: " + mode);
+                }
+                else
+                {
+                    Invoke(new Action(() =>
+                    {
+                        if (_rbServer.Checked)      mode = "server";
+                        else if (_rbClient.Checked) mode = "client";
+                        else                        mode = "both";
+                    }));
+                }
 
-                Log("Mode      : " + mode);
+                Log(_updateMode ? "Mode      : update (" + mode + ")" : "Mode      : " + mode);
                 Log("Directory : " + _installDir);
                 Log("");
-                Log("Starting install script...", Color.FromArgb(110, 185, 255));
+                Log(_updateMode ? "Starting update script..." : "Starting install script...", Color.FromArgb(110, 185, 255));
+
+                var psArgs = string.Format(
+                    "-NoProfile -ExecutionPolicy Bypass -File \"{0}\"" +
+                    " -InstallMode \"{1}\" -InstallDir \"{2}\" -SkipMaintenanceDialog",
+                    Path.Combine(tempRoot, "install.ps1"), mode, _installDir);
+                if (_updateMode)
+                    psArgs += " -UpdateMode";
 
                 var psi = new ProcessStartInfo
                 {
                     FileName  = "powershell.exe",
-                    Arguments = string.Format(
-                        "-NoProfile -ExecutionPolicy Bypass -File \"{0}\"" +
-                        " -InstallMode \"{1}\" -InstallDir \"{2}\" -SkipMaintenanceDialog",
-                        Path.Combine(tempRoot, "install.ps1"), mode, _installDir),
+                    Arguments = psArgs,
                     WorkingDirectory       = tempRoot,
                     UseShellExecute        = false,
                     RedirectStandardOutput = true,
@@ -474,7 +513,7 @@ namespace SaUsErpInstaller
 
         private void RunUninstall()
         {
-            Log("SA-US ERP Uninstaller v2.7.0", Color.FromArgb(110, 185, 255));
+            Log("SA-US ERP Uninstaller v2.8.4", Color.FromArgb(110, 185, 255));
             Log(new string('-', 44), Color.FromArgb(70, 70, 70));
             Log("Removing SA-US ERP from: " + _installDir);
             Log("");
@@ -559,12 +598,36 @@ namespace SaUsErpInstaller
                     _btnViewLog.Visible = true;
                 }
             }
+            else if (_updateMode)
+            {
+                if (_installSuccess)
+                {
+                    _lblDoneTitle.Text      = "Update Complete!";
+                    _lblDoneTitle.ForeColor = Color.FromArgb(0, 140, 0);
+                    _lblDoneDetail.Text     =
+                        "SA-US ERP has been updated to v2.8.4 at:\r\n" + _installDir +
+                        "\r\n\r\nYour database and configuration files were preserved.\r\n" +
+                        "A database backup was created in the server folder.";
+                    _btnOpenFolder.Enabled  = true;
+                }
+                else
+                {
+                    _lblDoneTitle.Text      = "Update Failed";
+                    _lblDoneTitle.ForeColor = Color.DarkRed;
+                    _lblDoneDetail.Text     =
+                        "The update did not complete successfully.\r\n" +
+                        "Your existing installation was not modified.\r\n\r\n" +
+                        "Click View Installation Log to see error details.";
+                    _btnOpenFolder.Enabled  = false;
+                    _btnViewLog.Visible     = true;
+                }
+            }
             else if (_installSuccess)
             {
                 _lblDoneTitle.Text      = "Installation Complete!";
                 _lblDoneTitle.ForeColor = Color.FromArgb(0, 140, 0);
                 _lblDoneDetail.Text     =
-                    "SA-US ERP v2.7.0 has been installed to:\r\n" + _installDir +
+                    "SA-US ERP v2.8.4 has been installed to:\r\n" + _installDir +
                     "\r\n\r\nShortcuts have been created on the Desktop and Start Menu.";
                 _btnOpenFolder.Enabled  = true;
             }
@@ -624,6 +687,20 @@ namespace SaUsErpInstaller
                     throw new InvalidOperationException("Missing embedded resource: " + name);
                 using (var f = File.Create(outPath)) s.CopyTo(f);
             }
+        }
+
+        private static string GetInstalledVersion()
+        {
+            try
+            {
+                using (var key = Registry.CurrentUser.OpenSubKey(
+                    @"Software\Microsoft\Windows\CurrentVersion\Uninstall\SA-US ERP"))
+                {
+                    if (key != null) return key.GetValue("DisplayVersion") as string;
+                }
+            }
+            catch { }
+            return null;
         }
 
         private static string GetExistingInstallDir()

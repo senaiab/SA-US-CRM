@@ -3,7 +3,8 @@
     [ValidateSet("", "server", "client", "both")]
     [string]$InstallMode = "",
     [switch]$SkipShortcuts,
-    [switch]$SkipMaintenanceDialog
+    [switch]$SkipMaintenanceDialog,
+    [switch]$UpdateMode
 )
 
 $ErrorActionPreference = "Stop"
@@ -47,7 +48,8 @@ function Copy-TreePreservingConfig {
             "server_config.ini",
             "client_config.ini",
             "tenant_branding.json",
-            "company_logo.png"
+            "company_logo.png",
+            "sa_us_erp.db"
         )
 
         if ((Test-Path -LiteralPath $target) -and ($configNames -contains $_.Name)) {
@@ -238,6 +240,17 @@ try {
     "InstallMode=$InstallMode" | Out-File -FilePath $logPath -Append -Encoding utf8
 
     New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
+
+    if ($UpdateMode) {
+        Write-Host "Update mode: preserving database and configuration files."
+        $dbPath = Join-Path $InstallDir "server\sa_us_erp.db"
+        if (Test-Path -LiteralPath $dbPath) {
+            $backupPath = $dbPath + ".bak-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+            Copy-Item -LiteralPath $dbPath -Destination $backupPath -Force
+            Write-Host "Database backed up to: $backupPath"
+        }
+    }
+
     $readmeSrc = Join-Path $payloadRoot "README.txt"
     if (Test-Path -LiteralPath $readmeSrc) {
         Copy-Item -LiteralPath $readmeSrc -Destination (Join-Path $InstallDir "README.txt") -Force
@@ -324,7 +337,7 @@ start "" "%InstallDir%"
     $uninstallKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\SA-US ERP"
     New-Item -Path $uninstallKey -Force | Out-Null
     New-ItemProperty -Path $uninstallKey -Name "DisplayName" -Value "SA-US ERP" -PropertyType String -Force | Out-Null
-    New-ItemProperty -Path $uninstallKey -Name "DisplayVersion" -Value "2.7.0" -PropertyType String -Force | Out-Null
+    New-ItemProperty -Path $uninstallKey -Name "DisplayVersion" -Value "2.8.4" -PropertyType String -Force | Out-Null
     New-ItemProperty -Path $uninstallKey -Name "Publisher" -Value "SA Ultimate Solutions" -PropertyType String -Force | Out-Null
     New-ItemProperty -Path $uninstallKey -Name "InstallLocation" -Value $InstallDir -PropertyType String -Force | Out-Null
     New-ItemProperty -Path $uninstallKey -Name "UninstallString" -Value "`"$InstallDir\uninstall.cmd`"" -PropertyType String -Force | Out-Null
@@ -358,7 +371,11 @@ cors_origins = http://127.0.0.1,http://localhost
     "Installed successfully: $(Get-Date -Format s)" | Out-File -FilePath $logPath -Append -Encoding utf8
 
     Write-Host ""
-    Write-Host "SA-US ERP installed successfully."
+    if ($UpdateMode) {
+        Write-Host "SA-US ERP updated to v2.8.4 successfully."
+    } else {
+        Write-Host "SA-US ERP v2.8.4 installed successfully."
+    }
     Write-Host "Installed mode: $InstallMode"
     Write-Host "Install folder: $InstallDir"
     Write-Host ""
