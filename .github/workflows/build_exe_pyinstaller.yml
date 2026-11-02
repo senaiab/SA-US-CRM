@@ -72,6 +72,11 @@ jobs:
           if (Test-Path "client\branding") {
             Copy-Item -Recurse "client\branding" "dist\client\branding"
           }
+          # Bundle ICO into branding folder so install.ps1 can use it for desktop shortcuts
+          if (Test-Path "build_icon.ico") {
+            New-Item -ItemType Directory -Force "dist\client\branding" | Out-Null
+            Copy-Item "build_icon.ico" "dist\client\branding\app_icon.ico"
+          }
 
       - name: Assemble and build SA-US-ERP-Setup.exe
         shell: pwsh

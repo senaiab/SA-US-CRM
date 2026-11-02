@@ -50,9 +50,16 @@ namespace SaUsErpInstaller
         private Label _lblDoneTitle, _lblDoneDetail;
         private Button _btnOpenFolder, _btnViewLog;
 
+        // Page 3 — title ref so uninstall can relabel it
+        private Label _lblProgressTitle;
+
         private bool _installSuccess;
+        private bool _uninstallMode;
         private string _installDir;
         private string _existingDir;
+
+        // Page 1 — uninstall option (only when existing install found)
+        private RadioButton _rbUninstall;
 
         public int ExitCode { get; private set; }
 
@@ -170,8 +177,8 @@ namespace SaUsErpInstaller
                 p.Controls.Add(MakeTitle("Existing Installation Found", 24, 18));
                 p.Controls.Add(MakeLabel(
                     "SA-US ERP is already installed at:\r\n" + _existingDir +
-                    "\r\n\r\nChoose what to repair / reinstall:",
-                    24, 66, 520, 80));
+                    "\r\n\r\nChoose an option:",
+                    24, 66, 520, 60));
             }
             else
             {
@@ -183,6 +190,13 @@ namespace SaUsErpInstaller
             _rbBoth   = MakeRadio("Both server and client  (recommended for single-PC setup)",   40, 176);
             _rbBoth.Checked = true;
             p.Controls.AddRange(new Control[] { _rbServer, _rbClient, _rbBoth });
+            if (_existingDir != null)
+            {
+                var sep2 = new Panel { BackColor = Color.FromArgb(220, 220, 220), Bounds = new Rectangle(24, 206, 520, 1) };
+                _rbUninstall = MakeRadio("Remove / Uninstall SA-US ERP from this computer", 40, 218);
+                _rbUninstall.ForeColor = Color.DarkRed;
+                p.Controls.AddRange(new Control[] { sep2, _rbUninstall });
+            }
             return p;
         }
 
@@ -225,7 +239,8 @@ namespace SaUsErpInstaller
         private TabPage BuildPage3_Progress()
         {
             var p = NewPage();
-            p.Controls.Add(MakeTitle("Installing SA-US ERP...", 24, 18));
+            _lblProgressTitle = MakeTitle("Installing SA-US ERP...", 24, 18);
+            p.Controls.Add(_lblProgressTitle);
 
             _progressBar = new ProgressBar
             {
@@ -316,6 +331,8 @@ namespace SaUsErpInstaller
                     _btnBack.Enabled   = false;
                     _btnNext.Enabled   = false;
                     _btnCancel.Enabled = false;
+                    if (_uninstallMode && _lblProgressTitle != null)
+                        _lblProgressTitle.Text = "Removing SA-US ERP...";
                     StartInstall();
                     break;
                 case 4:
@@ -329,6 +346,14 @@ namespace SaUsErpInstaller
         {
             int page = _tab.SelectedIndex;
             if (page == 4) { ExitCode = _installSuccess ? 0 : 1; Close(); return; }
+
+            // Uninstall path: skip directory page, go straight to progress
+            if (page == 1 && _rbUninstall != null && _rbUninstall.Checked)
+            {
+                _uninstallMode = true;
+                ShowPage(3);
+                return;
+            }
 
             if (page == 2 && string.IsNullOrWhiteSpace(_txtDir.Text))
             {
@@ -356,12 +381,14 @@ namespace SaUsErpInstaller
 
         private void StartInstall()
         {
-            _installDir = _txtDir.Text.Trim();
+            _installDir = _uninstallMode ? _existingDir : _txtDir.Text.Trim();
             new Thread(RunInstall) { IsBackground = true }.Start();
         }
 
         private void RunInstall()
         {
+            if (_uninstallMode) { RunUninstall(); return; }
+
             string tempRoot = Path.Combine(Path.GetTempPath(),
                 "SA-US-ERP-" + Guid.NewGuid().ToString("N").Substring(0, 10));
             try
@@ -437,12 +464,94 @@ namespace SaUsErpInstaller
             BeginInvoke(new Action(ShowDone));
         }
 
+        private void RunUninstall()
+        {
+            Log("SA-US ERP Uninstaller v2.7.0", Color.FromArgb(110, 185, 255));
+            Log(new string('-', 44), Color.FromArgb(70, 70, 70));
+            Log("Removing SA-US ERP from: " + _installDir);
+            Log("");
+
+            var script = Path.Combine(_installDir, "uninstall.ps1");
+            if (!File.Exists(script))
+            {
+                Log("Uninstaller script not found: " + script, Color.FromArgb(255, 100, 100));
+                Log("Please remove the folder manually: " + _installDir, Color.FromArgb(255, 165, 80));
+                _installSuccess = false;
+            }
+            else
+            {
+                try
+                {
+                    var psi = new ProcessStartInfo
+                    {
+                        FileName  = "powershell.exe",
+                        Arguments = string.Format(
+                            "-NoProfile -ExecutionPolicy Bypass -File \"{0}\"" +
+                            " -InstallDir \"{1}\" -Quiet -KeepConfig",
+                            script, _installDir),
+                        UseShellExecute        = false,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError  = true,
+                        CreateNoWindow         = true
+                    };
+                    int exitCode;
+                    using (var proc = Process.Start(psi))
+                    {
+                        proc.OutputDataReceived += (s, e2) =>
+                            { if (e2.Data != null) Log(e2.Data); };
+                        proc.ErrorDataReceived  += (s, e2) =>
+                            { if (e2.Data != null) Log("[!] " + e2.Data, Color.FromArgb(255, 165, 80)); };
+                        proc.BeginOutputReadLine();
+                        proc.BeginErrorReadLine();
+                        proc.WaitForExit();
+                        exitCode = proc.ExitCode;
+                    }
+                    _installSuccess = exitCode == 0;
+                }
+                catch (Exception ex)
+                {
+                    Log("Error: " + ex.Message, Color.FromArgb(255, 100, 100));
+                    _installSuccess = false;
+                }
+            }
+
+            Log("");
+            Log(_installSuccess
+                ? "SA-US ERP removed successfully."
+                : "Uninstallation failed (see log above).",
+                _installSuccess ? Color.FromArgb(100, 210, 100) : Color.FromArgb(255, 100, 100));
+
+            BeginInvoke(new Action(ShowDone));
+        }
+
         private void ShowDone()
         {
             _progressBar.Style = ProgressBarStyle.Continuous;
             _progressBar.Value = 100;
 
-            if (_installSuccess)
+            if (_uninstallMode)
+            {
+                _btnOpenFolder.Visible = false;
+                if (_installSuccess)
+                {
+                    _lblDoneTitle.Text      = "Uninstallation Complete";
+                    _lblDoneTitle.ForeColor = Color.FromArgb(0, 140, 0);
+                    _lblDoneDetail.Text     =
+                        "SA-US ERP has been removed from your computer.\r\n\r\n" +
+                        "Configuration files were preserved in your AppData folder.\r\n\r\n" +
+                        "You may close this window.";
+                }
+                else
+                {
+                    _lblDoneTitle.Text      = "Uninstallation Failed";
+                    _lblDoneTitle.ForeColor = Color.DarkRed;
+                    _lblDoneDetail.Text     =
+                        "The uninstall did not complete successfully.\r\n" +
+                        "Click View Installation Log to see error details.";
+                    _btnViewLog.Visible = true;
+                }
+            }
+            else if (_installSuccess)
             {
                 _lblDoneTitle.Text      = "Installation Complete!";
                 _lblDoneTitle.ForeColor = Color.FromArgb(0, 140, 0);
