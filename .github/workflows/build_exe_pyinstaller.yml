@@ -77,6 +77,10 @@ jobs:
             New-Item -ItemType Directory -Force "dist\client\branding" | Out-Null
             Copy-Item "build_icon.ico" "dist\client\branding\app_icon.ico"
           }
+          # Copy user guide docs alongside the client EXE
+          if (Test-Path "client\docs") {
+            Copy-Item -Recurse "client\docs" "dist\client\docs"
+          }
 
       - name: Assemble and build SA-US-ERP-Setup.exe
         shell: pwsh
@@ -93,6 +97,9 @@ jobs:
           Copy-Item "$root\dist\server\SA_US_ERP_Server.exe" "$payload\server\"
           Copy-Item "$root\dist\client\SA_US_ERP_Client.exe" "$payload\client\"
           Copy-Item -Recurse "$root\dist\client\branding"    "$payload\client\branding"
+          if (Test-Path "$root\dist\client\docs") {
+            Copy-Item -Recurse "$root\dist\client\docs" "$payload\client\docs"
+          }
           Copy-Item -Recurse "$root\sql\."                   "$payload\sql\"
           if (Test-Path "$root\README.txt") {
             Copy-Item "$root\README.txt" "$payload\README.txt"

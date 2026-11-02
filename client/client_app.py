@@ -29,6 +29,8 @@ def save_prefs(data):
         pass
 
 
+import webbrowser
+
 import requests
 from openpyxl import Workbook, load_workbook
 from PIL import Image, ImageTk
@@ -1720,6 +1722,17 @@ Changing secret key / improving security
             save_prefs(prefs)
             _render(new_lang)
 
+        def _open_user_guide():
+            guide = BASE_DIR / "docs" / "SA-US-ERP-UserGuide.html"
+            if guide.exists():
+                webbrowser.open(guide.as_uri())
+            else:
+                messagebox.showinfo(
+                    "User Guide Not Found",
+                    f"Could not find the user guide at:\n{guide}\n\n"
+                    "Please reinstall the application."
+                )
+
         top_bar = Frame(frame, bg="#f8fafc")
         top_bar.pack(fill=X, padx=10, pady=(8, 0))
         Label(top_bar, text="Help & Troubleshooting Guide", font=("Segoe UI", 14, "bold"),
@@ -1727,6 +1740,9 @@ Changing secret key / improving security
         toggle_btn = Button(top_bar, text="", command=_toggle,
                             bg=PRIMARY_COLOR, fg="white", relief=FLAT, padx=10, pady=3)
         toggle_btn.pack(side=RIGHT)
+        Button(top_bar, text="📖 Open Full User Guide",
+               command=_open_user_guide,
+               bg="#16a34a", fg="white", relief=FLAT, padx=10, pady=3).pack(side=RIGHT, padx=(0, 8))
 
         canvas = Canvas(frame, bg="#f8fafc", highlightthickness=0)
         vscroll = ttk.Scrollbar(frame, orient="vertical", command=canvas.yview)

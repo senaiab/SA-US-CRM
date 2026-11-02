@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SA-US ERP User Guide</title>
+<style>
+  :root {
+    --primary: #1a56db;
+    --primary-dark: #1245b5;
+    --bg: #f9fafb;
+    --surface: #ffffff;
+    --border: #e5e7eb;
+    --text: #111827;
+    --muted: #6b7280;
+    --accent: #eff6ff;
+    --accent-border: #bfdbfe;
+    --warning: #fffbeb;
+    --warning-border: #fcd34d;
+    --code-bg: #f3f4f6;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    font-size: 16px;
+  }
+  /* Layout */
+  .wrapper { display: flex; min-height: 100vh; }
+  nav {
+    width: 260px;
+    min-width: 260px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 24px 0;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+  }
+  nav .logo {
+    padding: 0 20px 20px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 16px;
+  }
+  nav .logo span {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    color: var(--primary);
+  }
+  nav .logo p { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  nav ul { list-style: none; }
+  nav ul li a {
+    display: block;
+    padding: 7px 20px;
+    font-size: 14px;
+    color: var(--muted);
+    text-decoration: none;
+    border-left: 3px solid transparent;
+    transition: all .15s;
+  }
+  nav ul li a:hover { color: var(--primary); background: var(--accent); border-left-color: var(--primary); }
+  nav ul li.active a { color: var(--primary); font-weight: 600; border-left-color: var(--primary); background: var(--accent); }
+  nav ul li.section-header {
+    padding: 14px 20px 4px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--muted);
+  }
+  main {
+    flex: 1;
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 48px 40px;
+  }
+  /* Header */
+  .page-header {
+    background: linear-gradient(135deg, var(--primary) 0%, #2563eb 100%);
+    color: #fff;
+    border-radius: 12px;
+    padding: 36px 40px;
+    margin-bottom: 40px;
+  }
+  .page-header h1 { font-size: 28px; font-weight: 700; }
+  .page-header p { margin-top: 8px; opacity: .85; font-size: 15px; }
+  .page-header .meta { margin-top: 16px; font-size: 13px; opacity: .7; }
+  /* Language toggle */
+  .lang-toggle {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 32px;
+  }
+  .lang-btn {
+    padding: 8px 20px;
+    border: 2px solid var(--border);
+    background: var(--surface);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--muted);
+    transition: all .15s;
+  }
+  .lang-btn.active { border-color: var(--primary); color: var(--primary); background: var(--accent); }
+  /* Sections */
+  .section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 32px;
+    margin-bottom: 24px;
+  }
+  .section h2 {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .section h2 .icon {
+    width: 32px; height: 32px;
+    background: var(--accent);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+  .section h3 {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 20px 0 10px;
+    color: var(--text);
+  }
+  .section p { margin-bottom: 12px; }
+  .section ul, .section ol { padding-left: 20px; margin-bottom: 12px; }
+  .section li { margin-bottom: 6px; }
+  .section strong { font-weight: 600; }
+  code {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+  }
+  /* Note/callout */
+  .note {
+    background: var(--accent);
+    border: 1px solid var(--accent-border);
+    border-left: 4px solid var(--primary);
+    border-radius: 6px;
+    padding: 12px 16px;
+    font-size: 14px;
+    margin: 14px 0;
+  }
+  .note strong { color: var(--primary); }
+  .warning {
+    background: var(--warning);
+    border: 1px solid var(--warning-border);
+    border-left: 4px solid #f59e0b;
+    border-radius: 6px;
+    padding: 12px 16px;
+    font-size: 14px;
+    margin: 14px 0;
+  }
+  /* Table */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0;
+    font-size: 14px;
+  }
+  th {
+    background: var(--bg);
+    font-weight: 600;
+    text-align: left;
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+  }
+  td {
+    padding: 9px 14px;
+    border: 1px solid var(--border);
+  }
+  tr:nth-child(even) td { background: var(--bg); }
+  /* Steps */
+  .steps { counter-reset: step; list-style: none; padding: 0; }
+  .steps li {
+    counter-increment: step;
+    padding: 10px 14px 10px 48px;
+    position: relative;
+    background: var(--bg);
+    border-radius: 8px;
+    margin-bottom: 8px;
+  }
+  .steps li::before {
+    content: counter(step);
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 24px; height: 24px;
+    background: var(--primary);
+    color: #fff;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  /* HR */
+  hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+  /* Setup collapsible group */
+  .setup-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 16px;
+    background: var(--bg);
+    border: 1.5px solid var(--border);
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+    cursor: pointer;
+    margin-bottom: 20px;
+    transition: all .15s;
+    user-select: none;
+  }
+  .setup-toggle:hover { border-color: var(--primary); color: var(--primary); background: var(--accent); }
+  .setup-toggle .arrow { font-size: 10px; transition: transform .2s; }
+  .setup-toggle.open .arrow { transform: rotate(90deg); }
+  .setup-group { display: none; }
+  .setup-group.open { display: block; }
+  /* Amharic section */
+  .amharic { font-size: 15px; line-height: 1.8; }
+  /* Language sections */
+  .lang-en, .lang-am { }
+  body.show-am .lang-en { display: none; }
+  body.show-en .lang-am { display: none; }
+  /* Footer */
+  footer {
+    text-align: center;
+    padding: 32px;
+    font-size: 13px;
+    color: var(--muted);
+    border-top: 1px solid var(--border);
+    margin-top: 40px;
+  }
+  @media (max-width: 768px) {
+    nav { display: none; }
+    main { padding: 24px 16px; }
+    .page-header { padding: 24px 20px; }
+    .section { padding: 20px; }
+  }
+  @media print {
+    nav { display: none; }
+    main { max-width: 100%; padding: 20px; }
+    .lang-toggle { display: none; }
+    body.show-am .lang-am { display: block !important; }
+    body.show-en .lang-en { display: block !important; }
+    .lang-en, .lang-am { display: block !important; }
+  }
+</style>
+</head>
+<body class="show-en">
+
+<div class="wrapper">
+
+<!-- Sidebar Navigation -->
+<nav>
+  <div class="logo">
+    <span>SA-US ERP</span>
+    <p>User Guide v2.7.0</p>
+  </div>
+  <ul>
+    <li class="section-header">English</li>
+    <li><a href="#intro">📋 Introduction</a></li>
+    <li><a href="#" onclick="toggleSetup();return false;" style="font-size:13px;">⚙️ Setup Guide ▸</a></li>
+    <li><a href="#login">🔑 Logging In</a></li>
+    <li><a href="#daily">📅 Day-to-Day Use</a></li>
+    <li><a href="#network">🌐 Network Setup</a></li>
+    <li><a href="#trouble">🔧 Troubleshooting</a></li>
+    <li class="section-header">አማርኛ</li>
+    <li><a href="#amharic">🇪🇹 የአማርኛ መመሪያ</a></li>
+  </ul>
+</nav>
+
+<!-- Main Content -->
+<main>
+
+  <!-- Header -->
+  <div class="page-header">
+    <h1>SA-US ERP User Guide</h1>
+    <p>Complete guide for setting up and using SA-US ERP — Business Management System</p>
+    <div class="meta">Version 2.7.0 &nbsp;·&nbsp; SA Ultimate Solutions &nbsp;·&nbsp; November 2026</div>
+  </div>
+
+  <!-- Language Toggle -->
+  <div class="lang-toggle">
+    <button class="lang-btn active" onclick="setLang('en')" id="btn-en">🇬🇧 English</button>
+    <button class="lang-btn" onclick="setLang('am')" id="btn-am">🇪🇹 አማርኛ</button>
+  </div>
+
+  <!-- ============================================================ ENGLISH -->
+  <div class="lang-en">
+
+    <!-- Introduction -->
+    <div class="section" id="intro">
+      <h2><span class="icon">📋</span> Introduction</h2>
+      <p>SA-US ERP is a business management system that helps small and medium businesses manage customers, sales, invoices, and records from one place. It runs on your own computer — no internet required after installation.</p>
+
+      <h3>What you can do with SA-US ERP</h3>
+      <ul>
+        <li>Add and manage customers and contacts</li>
+        <li>Create and send invoices</li>
+        <li>Record payments and track balances</li>
+        <li>Manage products and services</li>
+        <li>View sales reports and summaries</li>
+      </ul>
+
+      <h3>How it works</h3>
+      <p>The system has two parts that work together:</p>
+      <ol>
+        <li><strong>Server</strong> — This is the engine that stores all your data. It runs quietly in the background on one computer (usually the main office computer).</li>
+        <li><strong>Client</strong> — This is the app you use every day. It connects to the server to show your data. Multiple people can run the client on different computers at the same time.</li>
+      </ol>
+      <div class="note"><strong>Note:</strong> All data is stored in a built-in database (SQLite) — no extra software required.</div>
+    </div>
+
+    <!-- Setup toggle chip -->
+    <div>
+      <button class="setup-toggle" id="setup-btn" onclick="toggleSetup()">
+        <span>⚙️</span> Setup <span class="arrow">▶</span>
+      </button>
+    </div>
+
+    <!-- Collapsible setup group -->
+    <div class="setup-group" id="setup-group">
+
+    <!-- Installation -->
+    <div class="section" id="install">
+      <h2><span class="icon">💿</span> Installation</h2>
+      <p>Installation only needs to be done once, on the main computer that will act as the server.</p>
+
+      <h3>What you need before you start</h3>
+      <ul>
+        <li>A Windows computer (Windows 10 or newer)</li>
+        <li>The installer file: <code>SA-US-ERP-Setup.exe</code></li>
+        <li>About 200 MB of free disk space</li>
+      </ul>
+
+      <h3>Steps</h3>
+      <ol class="steps">
+        <li>Find the file <code>SA-US-ERP-Setup.exe</code> and double-click it to open.</li>
+        <li>A setup window will appear. Click <strong>Next</strong> to begin.</li>
+        <li>Choose where to install. The default location (<code>C:\SA-US-ERP</code>) is recommended. Click <strong>Next</strong>.</li>
+        <li>The installer copies all files automatically. This takes about 1–2 minutes.</li>
+        <li>When it says <strong>Installation complete</strong>, click <strong>Finish</strong>.</li>
+      </ol>
+
+      <p>After installation, you will find two new items in your Start Menu:</p>
+      <ul>
+        <li><strong>SA-US ERP Server</strong> — starts the server (must be running before anyone can log in)</li>
+        <li><strong>SA-US ERP Client</strong> — the app you use to work with your data</li>
+      </ul>
+
+      <div class="note"><strong>Note:</strong> You do not need administrator rights to run the program after installation. The database is created automatically the first time the server starts.</div>
+    </div>
+
+    <!-- Server Setup -->
+    <div class="section" id="server-setup">
+      <h2><span class="icon">🖥️</span> First-Time Server Setup</h2>
+      <p>The server must be started before anyone can use the system. Do this on the main office computer.</p>
+
+      <h3>Starting the server</h3>
+      <ol class="steps">
+        <li>Open the Start Menu and click <strong>SA-US ERP Server</strong>.</li>
+        <li>A small black window will appear — this is the server running. <strong>Do not close it.</strong></li>
+        <li>You will see: <code>Uvicorn running on http://0.0.0.0:8000</code> — this means it is ready.</li>
+      </ol>
+
+      <div class="note"><strong>First run:</strong> The server automatically creates the database file (<code>sa_us_erp.db</code>) in the installation folder. No action needed.</div>
+
+      <h3>Creating the first admin account</h3>
+      <ol class="steps">
+        <li>Start the Client app (see Client Setup below).</li>
+        <li>On the login screen, click <strong>Register</strong> or <strong>Create Account</strong>.</li>
+        <li>Enter a username, email address, and a strong password.</li>
+        <li>The first account created is automatically given admin (administrator) access.</li>
+      </ol>
+
+      <h3>Keeping the server running</h3>
+      <ul>
+        <li>The server must stay open while people are using the system.</li>
+        <li>If you close the server window, no one will be able to log in until you start it again.</li>
+        <li>For an office that uses the system all day, start the server in the morning and leave it running.</li>
+      </ul>
+    </div>
+
+    <!-- Client Setup -->
+    <div class="section" id="client-setup">
+      <h2><span class="icon">💻</span> Client Setup</h2>
+      <p>The client is the app that staff use to access the system. It can be installed on one or many computers.</p>
+
+      <h3>Installing the client on additional computers</h3>
+      <ol class="steps">
+        <li>Copy the file <code>SA_US_ERP_Client.exe</code> from the installation folder (<code>C:\SA-US-ERP\client\</code>) to the other computer.</li>
+        <li>Double-click it to run — no installation wizard needed.</li>
+        <li>Create a shortcut on the desktop for easy access.</li>
+      </ol>
+
+      <h3>Connecting to the server</h3>
+      <p>The first time you open the client, it will ask for the <strong>Server Address</strong>. This is the IP address of the computer where the server is running.</p>
+      <ul>
+        <li>Same computer: <code>http://localhost:8000</code></li>
+        <li>Over a network: <code>http://192.168.1.10:8000</code> (use the server's actual IP)</li>
+      </ul>
+
+      <div class="note">
+        <strong>How to find the server IP address:</strong> On the server computer, open Command Prompt and type <code>ipconfig</code>. Look for the line that says <strong>IPv4 Address</strong> — for example: <code>192.168.1.10</code>.
+      </div>
+
+      <p>Once the address is saved, the client will remember it. You will not need to enter it again.</p>
+    </div>
+
+    </div><!-- /setup-group -->
+
+    <!-- Login & Dashboard -->
+    <div class="section" id="login">
+      <h2><span class="icon">🔑</span> Logging In and Dashboard</h2>
+
+      <h3>Logging in</h3>
+      <ol class="steps">
+        <li>Open the SA-US ERP Client.</li>
+        <li>Enter your <strong>username</strong> and <strong>password</strong>.</li>
+        <li>Click <strong>Login</strong>.</li>
+      </ol>
+      <p>If you see "Cannot connect to server", check that the server is running on the main computer.</p>
+
+      <h3>The Dashboard</h3>
+      <p>After logging in, the dashboard shows a summary of your business at a glance:</p>
+      <table>
+        <tr><th>Area</th><th>What it shows</th></tr>
+        <tr><td>Customers</td><td>Total number of active customers</td></tr>
+        <tr><td>Invoices</td><td>Recent invoices and their status</td></tr>
+        <tr><td>Payments</td><td>Payments received this month</td></tr>
+        <tr><td>Outstanding</td><td>Amount owed to you by customers</td></tr>
+      </table>
+
+      <h3>Navigating the app</h3>
+      <p>The menu on the left side lets you move between sections:</p>
+      <ul>
+        <li><strong>Customers</strong> — view, add, and edit customer records</li>
+        <li><strong>Invoices</strong> — create and manage invoices</li>
+        <li><strong>Payments</strong> — record payments received</li>
+        <li><strong>Products/Services</strong> — manage what you sell</li>
+        <li><strong>Reports</strong> — view summaries and export data</li>
+        <li><strong>Settings</strong> — admin options (admin users only)</li>
+      </ul>
+
+      <div class="warning"><strong>Tip:</strong> Always click <strong>Logout</strong> when leaving the computer to protect your data.</div>
+    </div>
+
+    <!-- Day-to-Day Use -->
+    <div class="section" id="daily">
+      <h2><span class="icon">📅</span> Day-to-Day Use</h2>
+
+      <h3>Adding a Customer</h3>
+      <ol class="steps">
+        <li>Click <strong>Customers</strong> in the left menu.</li>
+        <li>Click <strong>+ New Customer</strong>.</li>
+        <li>Fill in the customer's name, phone number, email, and address.</li>
+        <li>Click <strong>Save</strong>.</li>
+      </ol>
+
+      <h3>Creating an Invoice</h3>
+      <ol class="steps">
+        <li>Click <strong>Invoices</strong> in the left menu.</li>
+        <li>Click <strong>+ New Invoice</strong>.</li>
+        <li>Select the customer from the dropdown list.</li>
+        <li>Add items or services — enter the quantity and price for each.</li>
+        <li>The total is calculated automatically.</li>
+        <li>Click <strong>Save</strong> to save, or <strong>Save &amp; Send</strong> to email it to the customer.</li>
+      </ol>
+
+      <h3>Recording a Payment</h3>
+      <p>When a customer pays:</p>
+      <ol class="steps">
+        <li>Click <strong>Payments</strong> in the left menu.</li>
+        <li>Click <strong>+ New Payment</strong>.</li>
+        <li>Select the customer and the invoice being paid.</li>
+        <li>Enter the amount received and the date.</li>
+        <li>Click <strong>Save</strong>.</li>
+      </ol>
+      <p>The invoice status will update automatically to <strong>Paid</strong> or <strong>Partially Paid</strong>.</p>
+
+      <h3>Editing or Deleting Records</h3>
+      <ul>
+        <li>To edit: click on the record to open it, then click <strong>Edit</strong>.</li>
+        <li>To delete: open the record and click <strong>Delete</strong>. You will be asked to confirm.</li>
+      </ul>
+
+      <h3>Viewing Reports</h3>
+      <ol class="steps">
+        <li>Click <strong>Reports</strong> in the left menu.</li>
+        <li>Choose the type of report (Sales Summary, Outstanding Invoices, Payment History, etc.).</li>
+        <li>Select a date range.</li>
+        <li>Click <strong>Generate</strong>.</li>
+        <li>Print the report or export it as a file.</li>
+      </ol>
+    </div>
+
+    <!-- Network Setup -->
+    <div class="section" id="network">
+      <h2><span class="icon">🌐</span> Network Setup for Multiple Users</h2>
+      <p>SA-US ERP supports 3–4 users working at the same time over a local office network. No internet is required — all computers must be on the same Wi-Fi or wired network.</p>
+
+      <table>
+        <tr><th>Computer</th><th>What to install</th><th>What to run</th></tr>
+        <tr><td>Main office computer (server)</td><td>Full installer (<code>SA-US-ERP-Setup.exe</code>)</td><td>Server + Client</td></tr>
+        <tr><td>Other staff computers</td><td>Client only (<code>SA_US_ERP_Client.exe</code>)</td><td>Client only</td></tr>
+      </table>
+
+      <h3>Step-by-step for a 3-computer office</h3>
+      <ol class="steps">
+        <li>Install and start the server on the main computer (see Installation and Server Setup sections).</li>
+        <li>Find the server computer's IP address: open Command Prompt, type <code>ipconfig</code>, look for <strong>IPv4 Address</strong>.</li>
+        <li>On each staff computer, copy <code>SA_US_ERP_Client.exe</code> and open it.</li>
+        <li>When asked for the server address, enter: <code>http://&lt;server IP&gt;:8000</code> — for example: <code>http://192.168.1.10:8000</code></li>
+        <li>Each staff member logs in with their own account.</li>
+      </ol>
+
+      <h3>User Accounts</h3>
+      <ul>
+        <li>The admin can create accounts for each staff member from <strong>Settings → Users → Add User</strong>.</li>
+        <li>Each user gets their own username and password.</li>
+        <li>Admin users can see all settings; regular users can only access day-to-day functions.</li>
+      </ul>
+
+      <div class="warning"><strong>Important:</strong> The server computer must be turned on and the server must be running before other staff can log in.</div>
+    </div>
+
+    <!-- Troubleshooting -->
+    <div class="section" id="trouble">
+      <h2><span class="icon">🔧</span> Troubleshooting</h2>
+
+      <h3>"Cannot connect to server"</h3>
+      <p><strong>Cause:</strong> The server is not running, or the address is wrong.</p>
+      <ol class="steps">
+        <li>Go to the main computer and check that the Server window is open. If not, start it from the Start Menu.</li>
+        <li>Check the server address in the client settings. It should be <code>http://&lt;IP&gt;:8000</code>.</li>
+        <li>Make sure both computers are on the same network (same Wi-Fi or same router).</li>
+      </ol>
+
+      <hr>
+
+      <h3>"Wrong username or password"</h3>
+      <ul>
+        <li>Double-check the username and password. Passwords are case-sensitive.</li>
+        <li>If forgotten, an admin user can reset it from <strong>Settings → Users</strong>.</li>
+      </ul>
+
+      <hr>
+
+      <h3>The server window closes by itself</h3>
+      <p>This can happen if the computer goes to sleep. Fix: disable sleep mode on the server computer.</p>
+      <p>Go to: <strong>Settings → Power &amp; Sleep → Sleep → Never</strong></p>
+
+      <hr>
+
+      <h3>An invoice or record is missing</h3>
+      <ul>
+        <li>Check that you are logged into the correct account.</li>
+        <li>Use the search bar to look for the record by name or number.</li>
+        <li>Check if a filter is applied (e.g. only showing unpaid invoices) — clear the filter to see all records.</li>
+      </ul>
+
+      <hr>
+
+      <h3>The program does not open</h3>
+      <ul>
+        <li>Right-click the app and choose <strong>Run as administrator</strong>.</li>
+        <li>If it still does not open, restart the computer and try again.</li>
+        <li>Check that your antivirus is not blocking it — add an exception for the ERP folder if needed.</li>
+      </ul>
+
+      <hr>
+
+      <h3>Backing Up Your Data</h3>
+      <p>Your data is stored in a single file: <code>sa_us_erp.db</code> inside <code>C:\SA-US-ERP\server\</code></p>
+      <ul>
+        <li><strong>To back up:</strong> copy <code>sa_us_erp.db</code> to a USB drive or another location. Do this at least once a week.</li>
+        <li><strong>To restore:</strong> stop the server, replace the <code>sa_us_erp.db</code> file with your backup copy, then restart the server.</li>
+      </ul>
+    </div>
+
+  </div><!-- /lang-en -->
+
+  <!-- ============================================================ AMHARIC -->
+  <div class="lang-am" id="amharic">
+    <div class="section amharic">
+      <h2><span class="icon">🇪🇹</span> የአማርኛ መመሪያ</h2>
+      <p>ይህ ክፍል SA-US ERP ን እንዴት መጠቀም እንደሚቻል በአማርኛ ያብራራል።</p>
+
+      <hr>
+
+      <h3>ስለ ስርዓቱ</h3>
+      <p>SA-US ERP የንግድ አስተዳደር ሶፍትዌር ነው። ደንበኞችን፣ ክፍያዎችን፣ ደረሰኞችን እና ሂሳቦችን ለማስተዳደር ይረዳዎታል። ሁሉም መረጃ በኮምፒዩተርዎ ላይ ይቀመጣል — ኢንተርኔት አያስፈልግም።</p>
+
+      <hr>
+
+      <h3>መጫን (Installation)</h3>
+      <ol class="steps">
+        <li><code>SA-US-ERP-Setup.exe</code> ፋይሉን ሁለት ጊዜ ጠቅ ያድርጉ።</li>
+        <li>የጭነት መስኮቱ ሲከፈት <strong>Next</strong> ን ጠቅ ያድርጉ።</li>
+        <li>ፕሮግራሙ ራሱ ይጫናል — ከ1 እስከ 2 ደቂቃ ይወስዳል።</li>
+        <li>ጭነቱ ሲጠናቀቅ <strong>Finish</strong> ን ጠቅ ያድርጉ።</li>
+      </ol>
+
+      <hr>
+
+      <h3>አገልጋዩን ማስጀመር (Starting the Server)</h3>
+      <p>ሌሎች ሰዎች ስርዓቱን ከመጠቀማቸው በፊት አገልጋዩ (Server) መሰራት አለበት።</p>
+      <ol class="steps">
+        <li>Start Menu ን ክፈቱ።</li>
+        <li><strong>SA-US ERP Server</strong> ን ጠቅ ያድርጉ።</li>
+        <li>ጥቁር መስኮት ይከፈታል — ይህን <strong>አይዝጉ</strong>። አገልጋዩ እየሰራ ነው ማለት ነው።</li>
+      </ol>
+
+      <hr>
+
+      <h3>መግባት (Logging In)</h3>
+      <ol class="steps">
+        <li><strong>SA-US ERP Client</strong> ን ክፈቱ።</li>
+        <li>የተጠቃሚ ስምዎን (username) እና የይለፍ ቃልዎን (password) ያስገቡ።</li>
+        <li><strong>Login</strong> ን ጠቅ ያድርጉ።</li>
+      </ol>
+
+      <hr>
+
+      <h3>ደንበኛ ማስጨመር (Adding a Customer)</h3>
+      <ol class="steps">
+        <li>ከግራ ምናሌ <strong>Customers</strong> ን ጠቅ ያድርጉ።</li>
+        <li><strong>+ New Customer</strong> ን ጠቅ ያድርጉ።</li>
+        <li>ስም፣ ስልክ ቁጥር፣ ኢሜይል እና አድራሻ ያስገቡ።</li>
+        <li><strong>Save</strong> ን ጠቅ ያድርጉ።</li>
+      </ol>
+
+      <hr>
+
+      <h3>ደረሰኝ መፍጠር (Creating an Invoice)</h3>
+      <ol class="steps">
+        <li>ከግራ ምናሌ <strong>Invoices</strong> ን ጠቅ ያድርጉ።</li>
+        <li><strong>+ New Invoice</strong> ን ጠቅ ያድርጉ።</li>
+        <li>ደንበኛውን ከዝርዝሩ ውስጥ ይምረጡ።</li>
+        <li>የሸቀጦቹን ወይም አገልግሎቶቹን ስም፣ ቁጥር እና ዋጋ ያስገቡ።</li>
+        <li>ጠቅላላ ዋጋ በራስ ይሰላል።</li>
+        <li><strong>Save</strong> ን ጠቅ ያድርጉ።</li>
+      </ol>
+
+      <hr>
+
+      <h3>ክፍያ መቀበል (Recording a Payment)</h3>
+      <ol class="steps">
+        <li>ከግራ ምናሌ <strong>Payments</strong> ን ጠቅ ያድርጉ።</li>
+        <li><strong>+ New Payment</strong> ን ጠቅ ያድርጉ።</li>
+        <li>ደንበኛውን እና ደረሰኙን ይምረጡ።</li>
+        <li>የተከፈለውን መጠን እና ቀን ያስገቡ።</li>
+        <li><strong>Save</strong> ን ጠቅ ያድርጉ።</li>
+      </ol>
+
+      <hr>
+
+      <h3>ሪፖርት ማየት (Viewing Reports)</h3>
+      <ol class="steps">
+        <li>ከግራ ምናሌ <strong>Reports</strong> ን ጠቅ ያድርጉ።</li>
+        <li>የሪፖርቱን አይነት ይምረጡ።</li>
+        <li>የቀን ክልሉን ያስገቡ።</li>
+        <li><strong>Generate</strong> ን ጠቅ ያድርጉ።</li>
+        <li>ሪፖርቱን ያትሙ ወይም ወደ ፋይል ያስቀምጡ።</li>
+      </ol>
+
+      <hr>
+
+      <h3>ለብዙ ተጠቃሚዎች ኔትወርክ ማዋቀር (Network Setup)</h3>
+      <p>SA-US ERP 3–4 ሰዎች በአንድ ጊዜ እንዲጠቀሙ ያስችላል። ሁሉም ኮምፒዩተሮች በአንድ Wi-Fi ወይም ኔትወርክ ላይ መሆን አለባቸው።</p>
+      <ol class="steps">
+        <li>አገልጋዩን (Server) በዋናው ኮምፒዩተር ላይ ጫኑ እና ያስጀምሩ።</li>
+        <li>የዋናው ኮምፒዩተር IP አድራሻ ያግኙ: Command Prompt ክፍቱ፣ <code>ipconfig</code> ብለው ይተይቡ፣ <strong>IPv4 Address</strong> ን ይፈልጉ።</li>
+        <li>በእያንዳንዱ ሌላ ኮምፒዩተር <code>SA_US_ERP_Client.exe</code> ፋይሉን ቅዱ እና ክፈቱ።</li>
+        <li>የሰርቨሩ አድራሻ ሲጠየቁ ያስገቡ: <code>http://&lt;IP አድራሻ&gt;:8000</code> — ለምሳሌ: <code>http://192.168.1.10:8000</code></li>
+        <li>እያንዳንዱ ሰራተኛ የራሱ አካውንት ይኖረዋል።</li>
+      </ol>
+
+      <hr>
+
+      <h3>ችግሮች ሲኖሩ (Troubleshooting)</h3>
+
+      <p><strong>"Cannot connect to server" የሚል ስህተት:</strong></p>
+      <ul>
+        <li>ወደ ዋናው ኮምፒዩተር ሂዱ።</li>
+        <li>አገልጋዩ (Server) መስኮት ክፍት መሆኑን ያረጋግጡ።</li>
+        <li>ካልተከፈተ Start Menu ን ከፍተው <strong>SA-US ERP Server</strong> ን ይጀምሩ።</li>
+      </ul>
+
+      <p><strong>የይለፍ ቃሉን ከረሱ:</strong></p>
+      <ul>
+        <li>አስተዳዳሪ (admin) ተጠቃሚ <strong>Settings → Users</strong> ውስጥ ያድሱ።</li>
+      </ul>
+
+      <p><strong>ዳታ ምትኬ (Backup):</strong></p>
+      <p>ዳታዎ በ <code>sa_us_erp.db</code> ፋይል ውስጥ ነው (ይህ ፋይል <code>C:\SA-US-ERP\server\</code> ውስጥ ነው)። ይህን ፋይል ወደ USB ወይም ሌላ ቦታ ቅዱ — በሳምንት አንድ ጊዜ ቢያንስ።</p>
+      <p>ለመመለስ: አገልጋዩን ያቁሙ፣ ፋይሉን ከምትኬ ቦታ ይቅዱ፣ ከዚያ አገልጋዩን እንደገና ያስጀምሩ።</p>
+    </div>
+  </div><!-- /lang-am -->
+
+  <footer>
+    SA-US ERP User Guide &nbsp;·&nbsp; Version 2.7.0 &nbsp;·&nbsp; SA Ultimate Solutions &nbsp;·&nbsp; 2026
+  </footer>
+
+</main>
+</div>
+
+<script>
+  function setLang(lang) {
+    document.body.className = 'show-' + lang;
+    document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+    document.getElementById('btn-am').classList.toggle('active', lang === 'am');
+  }
+  function toggleSetup() {
+    var btn   = document.getElementById('setup-btn');
+    var group = document.getElementById('setup-group');
+    var open  = group.classList.toggle('open');
+    btn.classList.toggle('open', open);
+  }
+</script>
+</body>
+</html>
