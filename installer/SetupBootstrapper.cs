@@ -174,28 +174,36 @@ namespace SaUsErpInstaller
             var p = NewPage();
             if (_existingDir != null)
             {
+                // Existing install — layout shifted down to avoid label/radio overlap
                 p.Controls.Add(MakeTitle("Existing Installation Found", 24, 18));
                 p.Controls.Add(MakeLabel(
                     "SA-US ERP is already installed at:\r\n" + _existingDir +
-                    "\r\n\r\nChoose an option:",
-                    24, 66, 520, 60));
+                    "\r\n\r\nChoose an option below:",
+                    24, 62, 520, 76));
+
+                _rbServer = MakeRadio("Server only  \u2014  main office PC",                        40, 152);
+                _rbClient = MakeRadio("Client only  \u2014  staff PC connecting over the network",   40, 184);
+                _rbBoth   = MakeRadio("Both server and client  (recommended for single-PC setup)",   40, 216);
+                _rbBoth.Checked = true;
+                p.Controls.AddRange(new Control[] { _rbServer, _rbClient, _rbBoth });
+
+                // Uninstall option — only shown when existing install found
+                var sep2 = new Panel { BackColor = Color.FromArgb(200, 200, 200), Bounds = new Rectangle(24, 254, 520, 1) };
+                _rbUninstall = MakeRadio("Remove / Uninstall SA-US ERP from this computer", 40, 264);
+                _rbUninstall.ForeColor = Color.DarkRed;
+                p.Controls.AddRange(new Control[] { sep2, _rbUninstall });
             }
             else
             {
+                // Fresh install
                 p.Controls.Add(MakeTitle("Choose Installation Type", 24, 18));
                 p.Controls.Add(MakeLabel("Choose what to install on this machine:", 24, 66, 520, 26));
-            }
-            _rbServer = MakeRadio("Server only  \u2014  main office PC",                        40, 112);
-            _rbClient = MakeRadio("Client only  \u2014  staff PC connecting over the network",   40, 144);
-            _rbBoth   = MakeRadio("Both server and client  (recommended for single-PC setup)",   40, 176);
-            _rbBoth.Checked = true;
-            p.Controls.AddRange(new Control[] { _rbServer, _rbClient, _rbBoth });
-            if (_existingDir != null)
-            {
-                var sep2 = new Panel { BackColor = Color.FromArgb(220, 220, 220), Bounds = new Rectangle(24, 206, 520, 1) };
-                _rbUninstall = MakeRadio("Remove / Uninstall SA-US ERP from this computer", 40, 218);
-                _rbUninstall.ForeColor = Color.DarkRed;
-                p.Controls.AddRange(new Control[] { sep2, _rbUninstall });
+
+                _rbServer = MakeRadio("Server only  \u2014  main office PC",                        40, 112);
+                _rbClient = MakeRadio("Client only  \u2014  staff PC connecting over the network",   40, 144);
+                _rbBoth   = MakeRadio("Both server and client  (recommended for single-PC setup)",   40, 176);
+                _rbBoth.Checked = true;
+                p.Controls.AddRange(new Control[] { _rbServer, _rbClient, _rbBoth });
             }
             return p;
         }
