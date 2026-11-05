@@ -219,6 +219,7 @@ class API:
         self.role = None
         self.full_name = None
         self.must_change_password = False
+        self._modules_cache = None
 
     def headers(self):
         return {"Authorization": f"Bearer {self.token}"} if self.token else {}
@@ -246,11 +247,15 @@ class API:
         self.role = data.get("role")
         self.full_name = data.get("full_name")
         self.must_change_password = bool(data.get("must_change_password", False))
+        self._modules_cache = None  # clear cache on new login
         return data
 
     def modules(self):
+        if self._modules_cache is not None:
+            return self._modules_cache
         r = requests.get(f"{SERVER_URL}/modules", headers=self.headers(), timeout=10)
-        return self._handle(r).json()["modules"]
+        self._modules_cache = self._handle(r).json()["modules"]
+        return self._modules_cache
 
     def dashboard(self):
         r = requests.get(f"{SERVER_URL}/dashboard", headers=self.headers(), timeout=10)
@@ -338,16 +343,22 @@ class ForcePasswordChangeDialog(Toplevel):
         super().__init__(login_window)
         self.login_window = login_window
         self.api = api
-        self.title("Change Password Required")
-        self.geometry("420x320")
+        self.title("Action Required — Set New Password")
+        self.geometry("420x360")
         self.resizable(False, False)
         self.configure(bg="#f3f6fb")
         self.protocol("WM_DELETE_WINDOW", lambda: None)  # prevent close
         set_window_icon(self)
+        self.lift()
+        self.focus_force()
         self.grab_set()
 
-        Label(self, text="You must set a new password before continuing.", font=("Segoe UI", 10, "bold"),
-              bg="#f3f6fb", fg="#dc2626", wraplength=380, justify=LEFT).pack(pady=(20, 10), padx=20)
+        Label(self, text="⚠  Password Change Required", font=("Segoe UI", 13, "bold"),
+              bg="#f3f6fb", fg="#dc2626").pack(pady=(20, 4), padx=20)
+        Label(self, text="Your account requires a new password before you can continue.\n"
+              "Enter your current password (admin123 by default), then choose a new one.",
+              font=("Segoe UI", 9), bg="#f3f6fb", fg="#475569",
+              wraplength=380, justify=LEFT).pack(pady=(0, 12), padx=20)
 
         frm = Frame(self, bg="#f3f6fb")
         frm.pack(padx=20, fill=X)
@@ -387,6 +398,7 @@ class ForcePasswordChangeDialog(Toplevel):
             try:
                 self.api.change_own_password(cur, new)
                 self.api.must_change_password = False
+                self.api.modules()  # pre-cache so MainWindow opens instantly
                 self.after(0, self._done)
             except Exception as e:
                 self.after(0, lambda: (self.status.config(text=str(e)), self.btn.config(state=NORMAL, text="Set Password")))
@@ -471,6 +483,8 @@ class LoginWindow(Tk):
         def attempt():
             try:
                 self.api.login(self.username.get(), self.password.get())
+                if not self.api.must_change_password:
+                    self.api.modules()  # pre-cache so MainWindow opens instantly
                 self.after(0, self._on_login_success)
             except Exception as e:
                 self.after(0, lambda: self._on_login_fail(str(e)))
@@ -768,7 +782,14 @@ class MainWindow(Tk):
     def __init__(self, api):
         super().__init__()
         self.api = api
-        self.modules = api.modules()
+        try:
+            self.modules = api.modules()
+        except Exception as e:
+            messagebox.showerror("Connection Error",
+                f"Could not load modules from server:\n{e}\n\n"
+                "Make sure the server is running and try again.")
+            self.destroy()
+            return
         self.records = {}
         self.current_module = None
         self.title(f"{SOFTWARE_NAME} — {CLIENT_COMPANY_NAME} | {api.full_name} ({api.role})")
