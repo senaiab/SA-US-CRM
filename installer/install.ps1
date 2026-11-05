@@ -4,7 +4,15 @@
     [string]$InstallMode = "",
     [switch]$SkipShortcuts,
     [switch]$SkipMaintenanceDialog,
-    [switch]$UpdateMode
+    [switch]$UpdateMode,
+    [string]$DbType     = "sqlite",
+    [string]$DbHost     = "localhost",
+    [string]$DbPort     = "3306",
+    [string]$DbName     = "sa_us_erp",
+    [string]$DbRootUser = "root",
+    [string]$DbRootPass = "",
+    [string]$DbAppUser  = "sa_us_user",
+    [string]$DbAppPass  = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -351,16 +359,57 @@ start "" "%InstallDir%"
     New-ItemProperty -Path $uninstallKey -Name "NoRepair" -Value 1 -PropertyType DWord -Force | Out-Null
 
     if ($InstallMode -eq "server" -or $InstallMode -eq "both") {
-        # SQLite database is created automatically on first server startup — no setup needed.
         $serverConfigPath = Join-Path $InstallDir "server\server_config.ini"
+
+        if ($DbType -eq "mysql") {
+            # Create MySQL database using mysql.exe
+            Write-Host "Setting up MySQL database..."
+            $mysql = $null
+            try { $mysql = (Get-Command mysql -ErrorAction SilentlyContinue).Source } catch {}
+            if (-not $mysql) {
+                $searchRoots = @(
+                    "$env:ProgramFiles\MySQL",
+                    "${env:ProgramFiles(x86)}\MySQL",
+                    "C:\xampp\mysql\bin",
+                    "C:\wamp64\bin\mysql"
+                )
+                foreach ($root in $searchRoots) {
+                    $found = Get-ChildItem $root -Filter "mysql.exe" -Recurse -ErrorAction SilentlyContinue |
+                             Sort-Object LastWriteTime -Descending | Select-Object -First 1
+                    if ($found) { $mysql = $found.FullName; break }
+                }
+            }
+            if (-not $mysql) {
+                throw "mysql.exe not found. Please install MySQL client tools and ensure they are in PATH, then re-run setup."
+            }
+            Write-Host "Using MySQL client: $mysql"
+
+            $sqlScript = @"
+CREATE DATABASE IF NOT EXISTS ``$DbName`` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER IF NOT EXISTS '$DbAppUser'@'%' IDENTIFIED BY '$DbAppPass';
+GRANT ALL PRIVILEGES ON ``$DbName``.* TO '$DbAppUser'@'%';
+FLUSH PRIVILEGES;
+"@
+            $tmpSql = [System.IO.Path]::GetTempFileName() + ".sql"
+            $sqlScript | Set-Content -Path $tmpSql -Encoding UTF8
+            try {
+                $result = & "$mysql" -h $DbHost -P $DbPort -u $DbRootUser "-p$DbRootPass" --batch --execute "source $tmpSql" 2>&1
+                if ($LASTEXITCODE -ne 0) { throw "MySQL setup failed: $result" }
+                Write-Host "MySQL database '$DbName' created successfully."
+            } finally {
+                Remove-Item $tmpSql -ErrorAction SilentlyContinue
+            }
+
+            $dbUrl = "mysql+pymysql://${DbAppUser}:${DbAppPass}@${DbHost}:${DbPort}/${DbName}"
+        } else {
+            $dbUrl = "sqlite:///./sa_us_erp.db"
+            Write-Host "SQLite database will be created automatically when the server first starts."
+        }
+
         if (!(Test-Path -LiteralPath $serverConfigPath)) {
-            $exampleConfig = Join-Path $InstallDir "server\server_config.example.ini"
-            if (Test-Path -LiteralPath $exampleConfig) {
-                Copy-Item -LiteralPath $exampleConfig -Destination $serverConfigPath
-            } else {
 @"
 [database]
-url = sqlite:///./sa_us_erp.db
+url = $dbUrl
 
 [server]
 host = 0.0.0.0
@@ -368,9 +417,10 @@ port = 8080
 secret_key = CHANGE_THIS_TO_A_RANDOM_SECRET
 cors_origins = http://127.0.0.1,http://localhost
 "@ | Set-Content -Path $serverConfigPath -Encoding UTF8
-            }
+            Write-Host "Server config written: $serverConfigPath"
+        } else {
+            Write-Host "Existing server config preserved: $serverConfigPath"
         }
-        Write-Host "SQLite database will be created automatically when the server first starts."
     }
 
     "Installed successfully: $(Get-Date -Format s)" | Out-File -FilePath $logPath -Append -Encoding utf8

@@ -42,15 +42,22 @@ namespace SaUsErpInstaller
         // Page 2 — Directory
         private TextBox _txtDir;
 
-        // Page 3 — Progress
+        // Page 3 — DB Config
+        private RadioButton _rbSQLite, _rbMySQL;
+        private Panel  _mysqlPanel;
+        private TextBox _txtDbHost, _txtDbPort, _txtDbName;
+        private TextBox _txtDbRootUser, _txtDbRootPass;
+        private TextBox _txtDbAppUser, _txtDbAppPass;
+
+        // Page 4 — Progress
         private ProgressBar _progressBar;
         private RichTextBox _rtbLog;
 
-        // Page 4 — Done
+        // Page 5 — Done
         private Label _lblDoneTitle, _lblDoneDetail;
         private Button _btnOpenFolder, _btnViewLog;
 
-        // Page 3 — title ref so uninstall can relabel it
+        // Page 4 — title ref so uninstall can relabel it
         private Label _lblProgressTitle;
 
         private bool _installSuccess;
@@ -115,8 +122,9 @@ namespace SaUsErpInstaller
             _tab.TabPages.Add(BuildPage0_Welcome());
             _tab.TabPages.Add(BuildPage1_Mode());
             _tab.TabPages.Add(BuildPage2_Directory());
-            _tab.TabPages.Add(BuildPage3_Progress());
-            _tab.TabPages.Add(BuildPage4_Done());
+            _tab.TabPages.Add(BuildPage3_DBConfig());
+            _tab.TabPages.Add(BuildPage4_Progress());
+            _tab.TabPages.Add(BuildPage5_Done());
 
             // 3. Separator line
             var sep = new Panel
@@ -256,7 +264,76 @@ namespace SaUsErpInstaller
             return p;
         }
 
-        private TabPage BuildPage3_Progress()
+        private TabPage BuildPage3_DBConfig()
+        {
+            var p = NewPage();
+            p.Controls.Add(MakeTitle("Database Configuration", 24, 18));
+            p.Controls.Add(MakeLabel(
+                "Choose where the server stores its data. SQLite requires no setup and is recommended for most offices.",
+                24, 66, 520, 36));
+
+            _rbSQLite = MakeRadio("SQLite  \u2014  built-in database, no setup required  (recommended)", 40, 110);
+            _rbSQLite.Checked = true;
+            _rbMySQL  = MakeRadio("MySQL  \u2014  use an existing MySQL / MariaDB server", 40, 132);
+
+            _mysqlPanel = new Panel
+            {
+                Bounds  = new Rectangle(24, 162, 530, 158),
+                Visible = false
+            };
+
+            Action toggleMySQL = () => _mysqlPanel.Visible = _rbMySQL.Checked;
+            _rbMySQL.CheckedChanged  += (s, e2) => toggleMySQL();
+            _rbSQLite.CheckedChanged += (s, e2) => toggleMySQL();
+
+            // Row 0 — host + port
+            _mysqlPanel.Controls.Add(MakeSmall2("Host:", 0, 2));
+            _txtDbHost = MakeTxt("localhost", 50, 0, 174);
+            _mysqlPanel.Controls.Add(_txtDbHost);
+            _mysqlPanel.Controls.Add(MakeSmall2("Port:", 234, 2));
+            _txtDbPort = MakeTxt("3306", 274, 0, 70);
+            _mysqlPanel.Controls.Add(_txtDbPort);
+
+            // Row 1 — database name
+            _mysqlPanel.Controls.Add(MakeSmall2("Database name:", 0, 30));
+            _txtDbName = MakeTxt("sa_us_erp", 112, 28, 240);
+            _mysqlPanel.Controls.Add(_txtDbName);
+
+            // Row 2 — root credentials
+            _mysqlPanel.Controls.Add(MakeSmall2("MySQL admin user:", 0, 60));
+            _txtDbRootUser = MakeTxt("root", 130, 58, 120);
+            _mysqlPanel.Controls.Add(_txtDbRootUser);
+            _mysqlPanel.Controls.Add(MakeSmall2("Admin password:", 260, 60));
+            _txtDbRootPass = MakeTxt("", 370, 58, 140);
+            _txtDbRootPass.PasswordChar = '\u25CF';
+            _mysqlPanel.Controls.Add(_txtDbRootPass);
+
+            // Row 3 — app credentials
+            _mysqlPanel.Controls.Add(MakeSmall2("App username:", 0, 90));
+            _txtDbAppUser = MakeTxt("sa_us_user", 100, 88, 140);
+            _mysqlPanel.Controls.Add(_txtDbAppUser);
+            _mysqlPanel.Controls.Add(MakeSmall2("App password:", 250, 90));
+            _txtDbAppPass = MakeTxt("", 350, 88, 150);
+            _txtDbAppPass.PasswordChar = '\u25CF';
+            _mysqlPanel.Controls.Add(_txtDbAppPass);
+
+            // Note
+            var note = new Label
+            {
+                Text      = "Admin credentials are only used to create the database and are not stored.",
+                Font      = new Font("Segoe UI", 8.5f),
+                ForeColor = Color.FromArgb(100, 100, 100),
+                AutoSize  = false,
+                Size      = new Size(520, 22),
+                Location  = new Point(0, 124)
+            };
+            _mysqlPanel.Controls.Add(note);
+
+            p.Controls.AddRange(new Control[] { _rbSQLite, _rbMySQL, _mysqlPanel });
+            return p;
+        }
+
+        private TabPage BuildPage4_Progress()
         {
             var p = NewPage();
             _lblProgressTitle = MakeTitle("Installing SA-US ERP...", 24, 18);
@@ -286,7 +363,7 @@ namespace SaUsErpInstaller
             return p;
         }
 
-        private TabPage BuildPage4_Done()
+        private TabPage BuildPage5_Done()
         {
             var p = NewPage();
 
@@ -329,12 +406,20 @@ namespace SaUsErpInstaller
 
         // ── Navigation ────────────────────────────────────────────────────────
 
+        private bool IsServerInstall()
+        {
+            if (_updateMode || _uninstallMode) return false;
+            if (_rbBoth   != null && _rbBoth.Checked)   return true;
+            if (_rbServer != null && _rbServer.Checked) return true;
+            return false;
+        }
+
         private void ShowPage(int page)
         {
             _tab.SelectedIndex = page;
 
-            _btnBack.Enabled   = page > 0 && page < 3;
-            _btnCancel.Visible = page < 4;
+            _btnBack.Enabled   = page > 0 && page < 4;
+            _btnCancel.Visible = page < 5;
             _btnNext.Visible   = true;
             _btnNext.Enabled   = true;
 
@@ -345,9 +430,12 @@ namespace SaUsErpInstaller
                     _btnNext.Text = "Next >";
                     break;
                 case 2:
-                    _btnNext.Text = "Install";
+                    _btnNext.Text = IsServerInstall() ? "Next >" : "Install";
                     break;
                 case 3:
+                    _btnNext.Text = "Install";
+                    break;
+                case 4:
                     _btnBack.Enabled   = false;
                     _btnNext.Enabled   = false;
                     _btnCancel.Enabled = false;
@@ -357,7 +445,7 @@ namespace SaUsErpInstaller
                         _lblProgressTitle.Text = "Updating SA-US ERP...";
                     StartInstall();
                     break;
-                case 4:
+                case 5:
                     _btnBack.Enabled = false;
                     _btnNext.Text    = "Finish";
                     break;
@@ -367,21 +455,21 @@ namespace SaUsErpInstaller
         private void OnNext(object s, EventArgs e)
         {
             int page = _tab.SelectedIndex;
-            if (page == 4) { ExitCode = _installSuccess ? 0 : 1; Close(); return; }
+            if (page == 5) { ExitCode = _installSuccess ? 0 : 1; Close(); return; }
 
-            // Update path: skip directory page, use existing dir, go straight to progress
+            // Update path: skip directory + DB config, go straight to progress
             if (page == 1 && _rbUpdate != null && _rbUpdate.Checked)
             {
                 _updateMode = true;
-                ShowPage(3);
+                ShowPage(4);
                 return;
             }
 
-            // Uninstall path: skip directory page, go straight to progress
+            // Uninstall path: skip directory + DB config, go straight to progress
             if (page == 1 && _rbUninstall != null && _rbUninstall.Checked)
             {
                 _uninstallMode = true;
-                ShowPage(3);
+                ShowPage(4);
                 return;
             }
 
@@ -391,6 +479,30 @@ namespace SaUsErpInstaller
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
+
+            // Client-only install: skip DB config page, go straight to progress
+            if (page == 2 && !IsServerInstall())
+            {
+                ShowPage(4);
+                return;
+            }
+
+            // DB Config page: validate MySQL fields if MySQL selected
+            if (page == 3 && _rbMySQL != null && _rbMySQL.Checked)
+            {
+                if (string.IsNullOrWhiteSpace(_txtDbHost.Text) ||
+                    string.IsNullOrWhiteSpace(_txtDbPort.Text) ||
+                    string.IsNullOrWhiteSpace(_txtDbName.Text) ||
+                    string.IsNullOrWhiteSpace(_txtDbRootPass.Text) ||
+                    string.IsNullOrWhiteSpace(_txtDbAppUser.Text) ||
+                    string.IsNullOrWhiteSpace(_txtDbAppPass.Text))
+                {
+                    MessageBox.Show("Please fill in all MySQL fields.", "Required",
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+            }
+
             ShowPage(page + 1);
         }
 
@@ -403,7 +515,7 @@ namespace SaUsErpInstaller
 
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
-            if (_tab.SelectedIndex == 3) { e.Cancel = true; return; }
+            if (_tab.SelectedIndex == 4) { e.Cancel = true; return; }
             base.OnFormClosing(e);
         }
 
@@ -460,10 +572,34 @@ namespace SaUsErpInstaller
                 Log("");
                 Log(_updateMode ? "Starting update script..." : "Starting install script...", Color.FromArgb(110, 185, 255));
 
+                string dbType = "sqlite";
+                string dbHost = "localhost", dbPort = "3306", dbName = "sa_us_erp";
+                string dbRootUser = "root", dbRootPass = "", dbAppUser = "sa_us_user", dbAppPass = "";
+                if (!_updateMode)
+                {
+                    Invoke(new Action(() =>
+                    {
+                        if (_rbMySQL != null && _rbMySQL.Checked)
+                        {
+                            dbType     = "mysql";
+                            dbHost     = _txtDbHost.Text.Trim();
+                            dbPort     = _txtDbPort.Text.Trim();
+                            dbName     = _txtDbName.Text.Trim();
+                            dbRootUser = _txtDbRootUser.Text.Trim();
+                            dbRootPass = _txtDbRootPass.Text;
+                            dbAppUser  = _txtDbAppUser.Text.Trim();
+                            dbAppPass  = _txtDbAppPass.Text;
+                        }
+                    }));
+                }
+
                 var psArgs = string.Format(
                     "-NoProfile -ExecutionPolicy Bypass -File \"{0}\"" +
-                    " -InstallMode \"{1}\" -InstallDir \"{2}\" -SkipMaintenanceDialog",
-                    Path.Combine(tempRoot, "install.ps1"), mode, _installDir);
+                    " -InstallMode \"{1}\" -InstallDir \"{2}\" -SkipMaintenanceDialog" +
+                    " -DbType \"{3}\" -DbHost \"{4}\" -DbPort \"{5}\" -DbName \"{6}\"" +
+                    " -DbRootUser \"{7}\" -DbRootPass \"{8}\" -DbAppUser \"{9}\" -DbAppPass \"{10}\"",
+                    Path.Combine(tempRoot, "install.ps1"), mode, _installDir,
+                    dbType, dbHost, dbPort, dbName, dbRootUser, dbRootPass, dbAppUser, dbAppPass);
                 if (_updateMode)
                     psArgs += " -UpdateMode";
 
@@ -643,7 +779,7 @@ namespace SaUsErpInstaller
                 _btnViewLog.Visible     = true;
             }
 
-            ShowPage(4);
+            ShowPage(5);
         }
 
         private void ShowLogDialog()
@@ -788,6 +924,28 @@ namespace SaUsErpInstaller
                 Text     = text,
                 Font     = new Font("Segoe UI", 10),
                 AutoSize = true,
+                Location = new Point(x, y)
+            };
+        }
+
+        private static Label MakeSmall2(string text, int x, int y)
+        {
+            return new Label
+            {
+                Text     = text,
+                Font     = new Font("Segoe UI", 9),
+                AutoSize = true,
+                Location = new Point(x, y + 3)
+            };
+        }
+
+        private static TextBox MakeTxt(string def, int x, int y, int w)
+        {
+            return new TextBox
+            {
+                Text     = def,
+                Font     = new Font("Segoe UI", 9.5f),
+                Size     = new Size(w, 22),
                 Location = new Point(x, y)
             };
         }
