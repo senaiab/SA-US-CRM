@@ -186,21 +186,21 @@ namespace SaUsErpInstaller
                 p.Controls.Add(MakeLabel(
                     "SA-US ERP is already installed at:\r\n" + _existingDir +
                     "\r\n\r\nChoose an option below:",
-                    24, 62, 520, 60));
+                    24, 62, 520, 52));
 
-                _rbUpdate = MakeRadio(updateLabel, 40, 130);
+                _rbUpdate = MakeRadio(updateLabel, 40, 120);
                 _rbUpdate.ForeColor = Color.FromArgb(0, 120, 0);
                 _rbUpdate.Checked = true;
 
-                var sep1 = new Panel { BackColor = Color.FromArgb(210, 210, 210), Bounds = new Rectangle(24, 168, 520, 1) };
-                p.Controls.Add(MakeSmall("Reinstall / Repair:", 24, 176));
+                var sep1 = new Panel { BackColor = Color.FromArgb(210, 210, 210), Bounds = new Rectangle(24, 154, 520, 1) };
+                p.Controls.Add(MakeSmall("Reinstall / Repair:", 24, 162));
 
-                _rbServer = MakeRadio("Server only  \u2014  main office PC",                        40, 198);
-                _rbClient = MakeRadio("Client only  \u2014  staff PC connecting over the network",   40, 228);
-                _rbBoth   = MakeRadio("Both server and client",                                      40, 258);
+                _rbServer = MakeRadio("Server only  \u2014  main office PC",                        40, 182);
+                _rbClient = MakeRadio("Client only  \u2014  staff PC connecting over the network",   40, 208);
+                _rbBoth   = MakeRadio("Both server and client",                                      40, 234);
 
-                var sep2 = new Panel { BackColor = Color.FromArgb(210, 210, 210), Bounds = new Rectangle(24, 284, 520, 1) };
-                _rbUninstall = MakeRadio("Remove / Uninstall SA-US ERP from this computer", 40, 294);
+                var sep2 = new Panel { BackColor = Color.FromArgb(210, 210, 210), Bounds = new Rectangle(24, 262, 520, 1) };
+                _rbUninstall = MakeRadio("Remove / Uninstall SA-US ERP from this computer", 40, 272);
                 _rbUninstall.ForeColor = Color.DarkRed;
 
                 p.Controls.AddRange(new Control[] { _rbUpdate, sep1, _rbServer, _rbClient, _rbBoth, sep2, _rbUninstall });
