@@ -350,7 +350,7 @@ start "" "%InstallDir%"
     $uninstallKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\SA-US ERP"
     New-Item -Path $uninstallKey -Force | Out-Null
     New-ItemProperty -Path $uninstallKey -Name "DisplayName" -Value "SA-US ERP" -PropertyType String -Force | Out-Null
-    New-ItemProperty -Path $uninstallKey -Name "DisplayVersion" -Value "2.8.4" -PropertyType String -Force | Out-Null
+    New-ItemProperty -Path $uninstallKey -Name "DisplayVersion" -Value "2.9.0" -PropertyType String -Force | Out-Null
     New-ItemProperty -Path $uninstallKey -Name "Publisher" -Value "SA Ultimate Solutions" -PropertyType String -Force | Out-Null
     New-ItemProperty -Path $uninstallKey -Name "InstallLocation" -Value $InstallDir -PropertyType String -Force | Out-Null
     New-ItemProperty -Path $uninstallKey -Name "UninstallString" -Value "`"$InstallDir\uninstall.cmd`"" -PropertyType String -Force | Out-Null
@@ -427,9 +427,9 @@ cors_origins = http://127.0.0.1,http://localhost
 
     Write-Host ""
     if ($UpdateMode) {
-        Write-Host "SA-US ERP updated to v2.8.4 successfully."
+        Write-Host "SA-US ERP updated to v2.9.0 successfully."
     } else {
-        Write-Host "SA-US ERP v2.8.4 installed successfully."
+        Write-Host "SA-US ERP v2.9.0 installed successfully."
     }
     Write-Host "Installed mode: $InstallMode"
     Write-Host "Install folder: $InstallDir"

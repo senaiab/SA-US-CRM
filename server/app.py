@@ -703,7 +703,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="SA-US ERP Local Network Server", version="2.4.0", lifespan=lifespan)
+app = FastAPI(title="SA-US ERP Local Network Server", version="2.9.0", lifespan=lifespan)
 _cors_origins = [o.strip() for o in config.get("server", "cors_origins", fallback="http://127.0.0.1,http://localhost").split(",") if o.strip()]
 app.add_middleware(CORSMiddleware, allow_origins=_cors_origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 

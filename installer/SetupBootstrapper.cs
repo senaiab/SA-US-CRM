@@ -169,7 +169,7 @@ namespace SaUsErpInstaller
         private TabPage BuildPage0_Welcome()
         {
             var p = NewPage();
-            p.Controls.Add(MakeTitle("Welcome to SA-US ERP Setup v2.8.4", 24, 18));
+            p.Controls.Add(MakeTitle("Welcome to SA-US ERP Setup v2.9.0", 24, 18));
             p.Controls.Add(MakeLabel(
                 "This wizard will install SA-US ERP on your computer.\r\n\r\n" +
                 "SA-US ERP is a business management system that includes:\r\n\r\n" +
@@ -187,8 +187,8 @@ namespace SaUsErpInstaller
             {
                 _installedVersion = GetInstalledVersion();
                 string updateLabel = string.IsNullOrEmpty(_installedVersion)
-                    ? "Update SA-US ERP to v2.8.4  (recommended)  \u2014  preserves database & config"
-                    : "Update from v" + _installedVersion + " to v2.8.4  (recommended)  \u2014  preserves database & config";
+                    ? "Update SA-US ERP to v2.9.0  (recommended)  \u2014  preserves database & config"
+                    : "Update from v" + _installedVersion + " to v2.9.0  (recommended)  \u2014  preserves database & config";
 
                 p.Controls.Add(MakeTitle("Existing Installation Found", 24, 18));
                 p.Controls.Add(MakeLabel(
@@ -535,7 +535,7 @@ namespace SaUsErpInstaller
                 "SA-US-ERP-" + Guid.NewGuid().ToString("N").Substring(0, 10));
             try
             {
-                Log("SA-US ERP Installer v2.8.4", Color.FromArgb(110, 185, 255));
+                Log("SA-US ERP Installer v2.9.0", Color.FromArgb(110, 185, 255));
                 Log(new string('-', 44), Color.FromArgb(70, 70, 70));
                 Log("Extracting installer resources...");
 
@@ -649,7 +649,7 @@ namespace SaUsErpInstaller
 
         private void RunUninstall()
         {
-            Log("SA-US ERP Uninstaller v2.8.4", Color.FromArgb(110, 185, 255));
+            Log("SA-US ERP Uninstaller v2.9.0", Color.FromArgb(110, 185, 255));
             Log(new string('-', 44), Color.FromArgb(70, 70, 70));
             Log("Removing SA-US ERP from: " + _installDir);
             Log("");
@@ -741,7 +741,7 @@ namespace SaUsErpInstaller
                     _lblDoneTitle.Text      = "Update Complete!";
                     _lblDoneTitle.ForeColor = Color.FromArgb(0, 140, 0);
                     _lblDoneDetail.Text     =
-                        "SA-US ERP has been updated to v2.8.4 at:\r\n" + _installDir +
+                        "SA-US ERP has been updated to v2.9.0 at:\r\n" + _installDir +
                         "\r\n\r\nYour database and configuration files were preserved.\r\n" +
                         "A database backup was created in the server folder.";
                     _btnOpenFolder.Enabled  = true;
@@ -763,7 +763,7 @@ namespace SaUsErpInstaller
                 _lblDoneTitle.Text      = "Installation Complete!";
                 _lblDoneTitle.ForeColor = Color.FromArgb(0, 140, 0);
                 _lblDoneDetail.Text     =
-                    "SA-US ERP v2.8.4 has been installed to:\r\n" + _installDir +
+                    "SA-US ERP v2.9.0 has been installed to:\r\n" + _installDir +
                     "\r\n\r\nShortcuts have been created on the Desktop and Start Menu.";
                 _btnOpenFolder.Enabled  = true;
             }
