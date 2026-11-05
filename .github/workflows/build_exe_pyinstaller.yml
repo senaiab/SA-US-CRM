@@ -44,6 +44,9 @@ jobs:
             --name SA_US_ERP_Server `
             --hidden-import passlib.handlers.bcrypt `
             --hidden-import passlib.handlers.pbkdf2 `
+            --hidden-import pymysql `
+            --hidden-import pymysql.converters `
+            --hidden-import sqlalchemy.dialects.mysql `
             --distpath ..\dist\server `
             app.py
 
@@ -198,6 +201,11 @@ jobs:
       - name: Build Server binary
         run: |
           pyinstaller --onefile --name SA_US_ERP_Server \
+            --hidden-import passlib.handlers.bcrypt \
+            --hidden-import passlib.handlers.pbkdf2 \
+            --hidden-import pymysql \
+            --hidden-import pymysql.converters \
+            --hidden-import sqlalchemy.dialects.mysql \
             --distpath dist/server \
             server/app.py
 
