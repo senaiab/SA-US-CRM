@@ -274,9 +274,16 @@ try {
 
     $serverExe = Join-Path $InstallDir "server\SA_US_ERP_Server.exe"
     $clientExe = Join-Path $InstallDir "client\SA_US_ERP_Client.exe"
-    $configExe = Join-Path $InstallDir "SA_US_ERP_Config.exe"
     $clientIcon = Join-Path $InstallDir "client\branding\app_icon.ico"
     $serverConsoleCmd = Join-Path $InstallDir "SA-US ERP Server Console.cmd"
+
+    # Remove stale shortcuts from older installs (config EXE that no longer exists)
+    $desktopDir = [Environment]::GetFolderPath("Desktop")
+    $startMenuDir = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\SA-US ERP"
+    @(
+        (Join-Path $desktopDir "SA-US ERP Configuration.lnk"),
+        (Join-Path $startMenuDir "SA-US ERP Configuration.lnk")
+    ) | ForEach-Object { if (Test-Path -LiteralPath $_) { Remove-Item -LiteralPath $_ -Force } }
     if ($InstallMode -eq "server" -or $InstallMode -eq "both") {
     @"
 @echo off
@@ -291,8 +298,6 @@ pause
     }
 
     if (!$SkipShortcuts) {
-        $startMenuDir = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\SA-US ERP"
-        $desktopDir = [Environment]::GetFolderPath("Desktop")
         New-Item -ItemType Directory -Force -Path $startMenuDir | Out-Null
 
         if ($InstallMode -eq "server" -or $InstallMode -eq "both") {
