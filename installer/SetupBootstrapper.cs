@@ -705,6 +705,7 @@ namespace SaUsErpInstaller
 
         private static string GetExistingInstallDir()
         {
+            // 1. HKCU registry (written by install.ps1)
             try
             {
                 using (var key = Registry.CurrentUser.OpenSubKey(
@@ -718,10 +719,42 @@ namespace SaUsErpInstaller
                 }
             }
             catch { }
-            var def = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "Programs", "SA-US ERP");
-            return Directory.Exists(def) ? def : null;
+
+            // 2. HKLM registry (in case a previous version wrote there)
+            try
+            {
+                using (var key = Registry.LocalMachine.OpenSubKey(
+                    @"Software\Microsoft\Windows\CurrentVersion\Uninstall\SA-US ERP"))
+                {
+                    if (key != null)
+                    {
+                        var loc = key.GetValue("InstallLocation") as string;
+                        if (!string.IsNullOrEmpty(loc) && Directory.Exists(loc)) return loc;
+                    }
+                }
+            }
+            catch { }
+
+            // 3. Common install paths — look for actual app EXEs
+            var candidates = new[]
+            {
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "Programs", "SA-US ERP"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                    "SA-US ERP"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
+                    "SA-US ERP"),
+            };
+
+            foreach (var c in candidates)
+            {
+                if (Directory.Exists(c) && (
+                    File.Exists(Path.Combine(c, "server", "SA_US_ERP_Server.exe")) ||
+                    File.Exists(Path.Combine(c, "client", "SA_US_ERP_Client.exe"))))
+                    return c;
+            }
+
+            return null;
         }
 
         private static Label MakeTitle(string text, int x, int y)
